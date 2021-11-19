@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Log-in Page</title>
+  <link rel="stylesheet"
+    href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    
+  <style type="text/css">
+	  body {
+		padding-top: 40px;
+		padding-bottom: 40px;
+		background-color: white;
+	  }
+	  .login-box {
+		max-width: 330px;
+		margin: 0 auto;
+	  }
+      .login-box .form-control {
+		margin-bottom: 10px;
+	  }
+  
+  </style>  
+</head>
+<body>
+  <div class="login-box">
+  <h1>Log-in Page</h1>
+  <font color="red"><%= message %><p> <br>
+  <font color="black">
+  <i> Enter your login information below! </i> <br>
+  <form action="/checklogin" method="post">
+  	<label for="uname">Username:</label>
+    <input type="text" id="uname" name="username" class="form-control">
+    
+    <label for="pword">Password:</label>
+    <input type="text" id="pword" name="password" class="form-control">
+    
+    <input type="submit" value="Login" class="btn btn-lg btn-primary btn-block">
+  </form>
+  <br>
+  <a href="signup">Create a new account</a>
+  <p>Creator: Matthew Currie (curriem)</p>
+  </div>
+</body>
+</html>

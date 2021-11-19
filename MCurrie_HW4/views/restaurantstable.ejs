@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>Restaurants Page</h1>
+  <table>
+  	<tr>
+  		<th>Restaurant</th>
+  		<th>Description</th>
+    	<th>Latitude</th>
+    	<th>Longitude</th>
+    	<th>Creator</th>
+  	</tr>
+  	<% DB_Items.forEach(function(item) { %>
+  	<tr>
+  		<td> <%= item.name.S %> </td>
+  		<td> <%= item.description.S %> </td>
+  		<td> <%= item.latitude.S %> </td>
+  		<td> <%= item.longitude.S %> </td>
+  		<td> <%= item.creator.S %> </td>
+    </tr>
+  	<% }); %>
+  </table> <br>
+  
+  <font color="red"><%= message %><p> <br>
+  <font color="black">
+  <i> Add a new restaurant below! </i> <br>
+  <form action="/addrestaurant" method="post">
+  	<label for="lat">Latitude:</label>
+    <input type="text" id="lat" name="latitude">
+    
+    <label for="long">Longitude:</label>
+    <input type="text" id="long" name="longitude">
+    
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name">
+    
+    <label for="desc">Description:</label>
+    <input type="text" id="desc" name="description">
+    
+    <input type="submit" value="Add">
+  </form>
+  
+  <a href="/logout">Logout</a>
+  
+</body>
+</html>

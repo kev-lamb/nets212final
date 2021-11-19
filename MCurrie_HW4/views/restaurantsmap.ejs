@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Restaurants Map</title>
+  <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCYWFmoJUsKVJHqciIR4CCgj06loXziqLY&callback=loadMap"></script>
+  <script src=”http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js">
+  </script><script type="text/javascript">
+  
+    // We will track the markers currently visible
+    // (useful when refreshing the markers on the client's screen)
+    var markerArr = new Array();  
+  
+    var map;
+    
+    var loadMap = function() {
+	        var myOptions = {
+	               center: new google.maps.LatLng(39.952335, -75.163789),
+	               zoom: 11, mapTypeId: google.maps.MapTypeId.ROADMAP
+	        };
+	      map = new google.maps.Map(document.getElementById("map"), myOptions);
+	      
+	    google.maps.event.addListener(map, 'click', 
+	      function( event ){
+	        document.getElementById('lat').value
+	         = event.latLng.lat();
+	        document.getElementById('long').value
+	         = event.latLng.lng();
+	      }
+	    );
+		    
+	    <% DB_Items.forEach(function(item) { %>   
+	        var itemLat = "<%= item.latitude.S %>";
+	        var itemLng = "<%= item.longitude.S %>";
+	        var itemName = "<%= item.name.S %>";
+	        var itemDesc = "<%= item.description.S %>";
+	        var itemCreator = "<%= item.creator.S %>";
+	        
+	        var currUser = "<%= Username %>";
+	        	        
+		    addMarker(itemName, itemDesc, itemCreator, itemLat, itemLng, currUser);
+		<% }); %>	
+		
+		// Begin the recurring timer for refreshing the restaurants
+		setTimeout(refRestaurants, 10*1000);
+    };
+    
+    var addRestaurant = function() {
+      var inputLat = document.getElementById('lat').value;
+      var inputLng = document.getElementById('long').value;
+      var inputName = document.getElementById('name').value;
+      var inputDesc = document.getElementById('desc').value;
+      var currUser = "<%= Username %>";
+      
+      var request = new XMLHttpRequest();
+      request.open("POST", "/restaurants");
+      request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      request.onreadystatechange  = function() {
+        if ((request.readyState == 4) && (request.status == 200)) {
+          // Check for error
+          var errorText = request.responseText;
+          if (errorText.length > 0) {
+            alert(errorText);
+            document.getElementById('errormsg').innerHTML = errorText;
+          } else {
+              document.getElementById('errormsg').innerHTML = "";
+              // Add new marker 
+	          addMarker(inputName, inputDesc, currUser, inputLat, inputLng, currUser);
+	          
+	          // Reset the value attributes of input text elements
+		      document.getElementById('lat').value = "";
+		      document.getElementById('long').value = "";
+		      document.getElementById('name').value = "";
+		      document.getElementById('desc').value = ""; 
+          }
+          
+        }
+      };
+      
+      var params = 'name='+inputName+'&latitude='+inputLat+'&longitude='+inputLng+'&description='+inputDesc+'&creator='+currUser
+      request.send(params);
+    };
+
+    var delRestaurant = function(rName) {    
+      var request = new XMLHttpRequest();
+      request.open("POST", "/restaurants");
+      request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      request.onreadystatechange  = function() {
+        if ((request.readyState == 4) && (request.status == 200)) {
+        
+          // The marker is already deleted, using the right-click handler,
+          // so not much is left to do but output an error, if one exists.
+          
+          var errorText = request.responseText;
+          if (errorText.length > 0) {
+            alert("Unable to delete: an error has occurred!");
+          } 
+        }
+      };
+      
+      var params = 'name='+rName;
+      request.send(params);
+    };
+    
+    var refRestaurants = function() {    
+      var request = new XMLHttpRequest();
+      request.open("POST", "/restaurants");
+      request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      request.onreadystatechange  = function() {
+        if ((request.readyState == 4) && (request.status == 200)) {        
+          var restList = JSON.parse(request.responseText);
+          if (restList.length != 0) {
+          
+            // Convert the list of table items to a list of corresponding restaurant names
+            var restNamesArr = new Array();
+            
+            restList.forEach(function(item) {
+              restNamesArr.push(item.name.S);
+            });
+            
+            
+            // Vanish the markers that are no longer in the table
+            markerArr.forEach(function(marker) {
+			  var currMarkerContent = marker.infowindow.content;
+			  var currMarkerRestName = currMarkerContent.split("b>")[1].split("</")[0];
+			  if (!restNamesArr.includes(currMarkerRestName)) {
+			    marker.setMap(null);
+			    var idxMarker = markerArr.indexOf(marker);
+			    markerArr.splice(idxMarker, 1);
+			  }
+            });
+               
+            // Convert the list of markers to a list of corresponding restaurant names
+            var markerRestNamesArr = new Array();
+            
+            markerArr.forEach(function(marker) {
+              var markerContent = marker.infowindow.content;
+			  var markerRestName = markerContent.split("b>")[1].split("</")[0];
+              markerRestNamesArr.push(markerRestName);
+            });
+            
+            // Create markers for the table items that are not currently represented
+            restList.forEach(function(item) {
+              var itemRestName = item.name.S;
+              if (!markerRestNamesArr.includes(itemRestName)) {
+                var itemLat = item.latitude.S;
+                var itemLng = item.longitude.S;
+                var itemDesc = item.description.S;
+                var itemCreator = item.creator.S;
+                var currUser = "<%= Username %>";
+                
+                addMarker(itemRestName, itemDesc, itemCreator, itemLat, itemLng, currUser);
+              }
+            
+            });
+          } 
+        }
+      };
+      
+      // No parameters needed for this method
+      request.send();
+      
+      setTimeout(refRestaurants, 10*1000);
+    };
+
+    var addMarker = function(name, desc, creator, lat, lng, currClient) {
+      var itemPos = new google.maps.LatLng(parseFloat(lat), parseFloat(lng));
+      
+	  var marker = new google.maps.Marker({
+	    position: itemPos, draggable: false
+	    });
+	
+	  marker['infowindow'] = new google.maps.InfoWindow({
+	    content: name.bold() + " | " + desc
+		+ " | " + "Added by ".italics() + creator.italics() 
+		});
+		
+	  google.maps.event.addListener(marker, 'click', function() {
+        this['infowindow'].open(map, this);
+	  });
+	  
+	  google.maps.event.addListener(marker, 'rightclick', function() {
+	  var markerContent = this.infowindow.content;
+	  
+	  var markerRestName = markerContent.split("b>")[1].split("</")[0];
+	  
+	  var idxOfInterest = markerContent.indexOf("Added by ") + 16;
+	  var markerMaker = markerContent.substring(idxOfInterest).split("</")[0];
+	    if (currClient == markerMaker) {
+	      this.setMap(null);
+	      
+	      // Delete the corresponding restaurant from the database
+	      delRestaurant(markerRestName);
+	    } else {
+	        alert("You may only delete markers that you've created!");
+	    }
+	  });
+		
+	  // Yellow icon iff the marker was created by the current user; red otherwise.
+	  var iconColor = ((currClient == creator) ? "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+		   : "http://maps.google.com/mapfiles/ms/icons/red-dot.png"); 
+	  marker.setIcon(iconColor);
+		
+	  marker.setMap(map);
+	  
+	  // Add the marker to the marker array
+	  markerArr.push(marker);    
+    };
+ 
+</script>
+</head>
+<body>
+  <div id="map" style="width:1250px;height:600px;"></div>
+  <div id="pos"></div>
+  <font color="red">
+  <div id="errormsg" font color="red"></div> <br>
+  <font color="black">
+  <i> Add a new restaurant below! </i> <br>
+  <form action="" method="" onSubmit="return false">
+  	<label for="lat">Latitude:</label>
+    <input type="text" id="lat" name="latitude">
+    
+    <label for="long">Longitude:</label>
+    <input type="text" id="long" name="longitude">
+    
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name">
+    
+    <label for="desc">Description:</label>
+    <input type="text" id="desc" name="description">
+    
+    <input type="submit" value="Add" onclick="addRestaurant()">
+  </form>
+  
+  <a href="/logout">Logout</a>
+  
+</body>
+</html>
