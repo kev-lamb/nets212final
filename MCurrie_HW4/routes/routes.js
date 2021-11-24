@@ -4,7 +4,32 @@ var db = require('../models/database.js');
 // through ejs, detailing a user's mistake.
 var error = '';
 
-// Route to the homepage (login page)
+/**
+Route to the homepage of the website.
+If a user is logged in, should send them to the homepage.
+If the user is not logged in, should send them to the login page
+ */
+var getHome = function(req, res) {
+	if (req.session.username) {
+		//user is logged in, should be sent to the homepage
+		//sending with username so homepage can be personalized to the logged in user
+		res.render('home.ejs', {user: req.session.username});
+	} else {
+		//no user is logged in, should be sent to the login page
+		res.redirect('/login')
+	}
+};
+
+/**
+Route to the wall of a particular user. 
+A request to this route should have the user_id of the user whose wall is being requested.
+TODO: Implement
+ */
+var getWall = function(req, res) {
+	
+};
+
+// Route to the login page
 var getLogin = function(req, res) {
   req.session.destroy();
   res.render('login.ejs', {message:error});
@@ -165,7 +190,9 @@ var routes = {
   new_restaurant: newRest,
   delete_restaurant: delRest,
   refresh_restaurant: refRest,
-  logout: logout
+  logout: logout,
+  get_home: getHome,
+  get_wall: getWall
 };
 
 module.exports = routes;

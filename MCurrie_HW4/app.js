@@ -23,8 +23,14 @@ app.use(session({
    between app.get and app.post; normal web requests are GETs, but
    POST is often used when submitting web forms ('method="post"'). */
 
+//home page
+app.get('/', routes.get_home);
+
+//wall page (for particular user)
+app.get('/wall', routes.get_wall);
+
 // Log-in page
-app.get('/', routes.get_login);
+app.get('/login', routes.get_login);
 
 // Log-in check
 app.post('/checklogin', routes.login_check);
