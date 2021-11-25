@@ -1,0 +1,17 @@
+{
+   "name": "FinalProject",
+   "description": "FB database",
+   "version": "0.0.1",
+   "scripts": {
+      "start": "node app.js"
+   },
+   "dependencies": {
+      "async": "*",
+      "aws-sdk": "*",
+      "bcrypt": "^5.0.1",
+      "ejs": "*",
+      "express": "*",
+      "express-session": "^1.17.2",
+      "lru-cache": "*"
+   }
+}
