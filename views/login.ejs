@@ -6,7 +6,6 @@
             rel="stylesheet"
             href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
         />
-
         <style type="text/css">
             body {
                 padding-top: 40px;
@@ -20,13 +19,34 @@
             .login-box .form-control {
                 margin-bottom: 10px;
             }
+            .incorrect {
+                border-color: red;
+            }
         </style>
+        <script>
+            function FormValidation() {
+                var elements = document.querySelectorAll('input');
+                var completed = true;
+                for (var i = 0, element; (element = elements[i++]); ) {
+                    element.classList.remove('incorrect');
+                    if (element.value === '') {
+                        element.classList.add('incorrect');
+                        completed = false;
+                    }
+                }
+                return completed;
+            }
+        </script>
     </head>
     <body>
         <div class="login-box">
             <h1>Log-in Page</h1>
             <i> Enter your login information below! </i> <br />
-            <form action="/checklogin" method="post">
+            <form
+                action="/checklogin"
+                method="post"
+                onsubmit="return FormValidation()"
+            >
                 <label for="uname">Username:</label>
                 <input
                     type="text"
@@ -50,7 +70,11 @@
                 />
             </form>
             <br />
-            <a href="signup">Create a new account</a>
+            <%if (errorMessage) { %>
+            <p style="color: red"><%=errorMessage%></p>
+            <% } %>
+            <br />
+            <a href="/signup">Create a new account</a>
             <p>Group: G31</p>
         </div>
     </body>

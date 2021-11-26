@@ -21,8 +21,10 @@ var getHome = function (req, res) {
     }
 };
 
+// [login] index based url query custom error messages
+let loginError = ['Login Information Incorrect'];
 var getLogin = function (req, res) {
-    res.render('login.ejs');
+    res.render('login.ejs', { errorMessage: loginError[req.query.error] });
 };
 
 // Verify the provided login information, and redirect to the restaurant table page (if no error)
@@ -33,7 +35,7 @@ var loginCheck = function (req, res) {
     db.login_check(username, password, function (err, data) {
         if (err) {
             error = err;
-            res.redirect('/');
+            res.redirect('/login?error=0');
         } else {
             if (!req.session.username) {
                 req.session.username = username;
@@ -43,8 +45,10 @@ var loginCheck = function (req, res) {
     });
 };
 
+// [signup] index based url query custom error messages
+let signupError = ['Sign Up Information Incorrect'];
 var getSignup = function (req, res) {
-    res.render('signup.ejs');
+    res.render('signup.ejs', { errorMessage: signupError[req.query.error] });
 };
 
 var newAccCheck = function (req, res) {
@@ -55,7 +59,7 @@ var newAccCheck = function (req, res) {
     db.new_acc_check(username, password, fullname, function (err, data) {
         if (err) {
             error = err;
-            res.redirect('/signup');
+            res.redirect('/signup?error=0');
         } else {
             if (!req.session.username) {
                 req.session.username = username;

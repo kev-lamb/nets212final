@@ -2,21 +2,86 @@
 <html>
     <head>
         <title>Sign-up Page</title>
+        <link
+            rel="stylesheet"
+            href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        />
+        <style type="text/css">
+            body {
+                padding-top: 40px;
+                padding-bottom: 40px;
+                background-color: white;
+            }
+            .signup-box {
+                max-width: 330px;
+                margin: 0 auto;
+            }
+            .signup-box .form-control {
+                margin-bottom: 10px;
+            }
+            .incorrect {
+                border-color: red;
+            }
+        </style>
+        <script>
+            function FormValidation() {
+                var elements = document.querySelectorAll('input');
+                var completed = true;
+                for (var i = 0, element; (element = elements[i++]); ) {
+                    element.classList.remove('incorrect');
+                    if (element.value === '') {
+                        element.classList.add('incorrect');
+                        completed = false;
+                    }
+                }
+                return completed;
+            }
+        </script>
     </head>
     <body>
-        <h1>Sign-up Page</h1>
-        <i> Enter your account information below! </i> <br />
-        <form action="/createaccount" method="post">
-            <label for="uname">Username:</label>
-            <input type="text" id="uname" name="username" />
+        <div class="signup-box">
+            <h1>Sign-up Page</h1>
+            <i> Enter your account information below! </i> <br />
+            <form
+                action="/createaccount"
+                method="post"
+                onsubmit="return FormValidation()"
+            >
+                <label for="uname">Username:</label>
+                <input
+                    type="text"
+                    id="uname"
+                    name="username"
+                    class="form-control"
+                />
 
-            <label for="pword">Password:</label>
-            <input type="text" id="pword" name="password" />
+                <label for="pword">Password:</label>
+                <input
+                    type="text"
+                    id="pword"
+                    name="password"
+                    class="form-control"
+                />
 
-            <label for="fname">Full Name:</label>
-            <input type="text" id="fname" name="fullname" />
+                <label for="fname">Full Name:</label>
+                <input
+                    type="text"
+                    id="fname"
+                    name="fullname"
+                    class="form-control"
+                />
 
-            <input type="submit" value="Submit" />
-        </form>
+                <input
+                    type="submit"
+                    value="Submit"
+                    class="btn btn-lg btn-primary btn-block"
+                />
+            </form>
+            <br />
+            <%if (errorMessage) { %>
+            <p style="color: red"><%=errorMessage%></p>
+            <% } %>
+            <a href="/login">Back to login</a>
+        </div>
     </body>
 </html>
