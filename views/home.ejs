@@ -6,10 +6,17 @@
             rel="stylesheet"
             href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
         />
+        <script
+            type="text/javascript"
+            src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
+        ></script>
+        <script src="home.js"></script>
     </head>
-    <body>
+    <body onload="loadData()">
         <div class="login-box">
             <h1><%= username %></h1>
+            <p id="firstname"></p>
+            <p id="lastname"></p>
         </div>
     </body>
 </html>

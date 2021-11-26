@@ -23,20 +23,7 @@
                 border-color: red;
             }
         </style>
-        <script>
-            function FormValidation() {
-                var elements = document.querySelectorAll('input');
-                var completed = true;
-                for (var i = 0, element; (element = elements[i++]); ) {
-                    element.classList.remove('incorrect');
-                    if (element.value === '') {
-                        element.classList.add('incorrect');
-                        completed = false;
-                    }
-                }
-                return completed;
-            }
-        </script>
+        <script src="formvalidation.js"></script>
     </head>
     <body>
         <div class="login-box">

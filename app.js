@@ -12,6 +12,7 @@ app.use(
         cookie: { secure: false },
     })
 );
+app.use(express.static('scripts'));
 
 // home page is first page we see
 app.get('/', routes.home_page);
@@ -27,6 +28,9 @@ app.post('/createaccount', routes.new_account_check);
 
 // check login page
 app.post('/checklogin', routes.login_check);
+
+// get user profile
+app.get('/data/userprofile', routes.get_user_profile);
 
 console.log('Author: G31');
 app.listen(8080);

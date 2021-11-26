@@ -64,12 +64,24 @@ var newAccCheck = function (req, res) {
     });
 };
 
+var loadUserProfile = function (req, res) {
+    console.log('Fetching User Profile Data');
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        db.get_user_profile_data(req.session.username, function (err, data) {
+            res.send(JSON.stringify(data));
+        });
+    }
+};
+
 var routes = {
     home_page: getHome,
     login_page: getLogin,
     signup_page: getSignup,
     new_account_check: newAccCheck,
     login_check: loginCheck,
+    get_user_profile: loadUserProfile,
 };
 
 module.exports = routes;

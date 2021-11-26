@@ -132,6 +132,20 @@ var myDB_new_acc_check = function (inputData, callback) {
         .catch((err) => console.error(err.message));
 };
 
+var myDB_data_user_profile = function (username, callback) {
+    var params = {
+        TableName: 'users',
+        Key: {
+            name: {
+                S: username,
+            },
+        },
+    };
+    db.getItem(params, function (err, data) {
+        callback(err, data);
+    });
+};
+
 async function sha256(message) {
     // encode as UTF-8
     const msgBuffer = new TextEncoder().encode(message);
@@ -151,6 +165,7 @@ async function sha256(message) {
 var database = {
     login_check: myDB_login_check,
     new_acc_check: myDB_new_acc_check,
+    get_user_profile_data: myDB_data_user_profile,
 };
 
 module.exports = database;
