@@ -40,7 +40,6 @@ var myDB_login_check = function (inputUname, inputPword, callback) {
                     bcrypt
                         .compare(inputPword, pword)
                         .then((res) => {
-                            console.log(res);
                             if (!res) {
                                 callback('Incorrect password!', null);
                             } else {
@@ -55,19 +54,14 @@ var myDB_login_check = function (inputUname, inputPword, callback) {
 };
 
 // Add a new item to the users table if the input username does not already exist
-var myDB_new_acc_check = function (
-    inputUname,
-    inputPword,
-    inputFname,
-    callback
-) {
+var myDB_new_acc_check = function (inputData, callback) {
     console.log(
         'New Acc Check: Querying for username: ' +
-            inputUname +
+            inputData.username +
             ', password: ' +
-            inputPword +
-            ', full name: ' +
-            inputFname
+            inputData.password +
+            ', first name: ' +
+            inputData.firstname
     );
 
     let params = {
@@ -78,61 +72,59 @@ var myDB_new_acc_check = function (
         },
         ExpressionAttributeValues: {
             ':uname': {
-                S: inputUname,
+                S: inputData.username,
             },
         },
     };
     const saltRounds = 10;
     bcrypt
-        .hash(inputPword, saltRounds)
+        .hash(inputData.password, saltRounds)
         .then((hash) => {
-            console.log(`Hash: ${hash}`);
             db.query(params, function (err, data) {
-                if (
-                    inputUname.length == 0 ||
-                    inputPword.length == 0 ||
-                    inputFname.length == 0
-                ) {
-                    callback('Complete all inputs!', null);
+                if (err) {
+                    callback(err, null);
                 } else {
-                    if (err) {
-                        console.log('putItem');
-                        callback(err, null);
+                    if (data.Items.length > 0) {
+                        callback('User already existed!', null);
                     } else {
-                        if (data.Items.length > 0) {
-                            callback('User already existed!', null);
-                        } else {
-                            let params = {
-                                TableName: 'users',
-                                Item: {
-                                    name: {
-                                        S: inputUname,
-                                    },
-                                    password: {
-                                        S: hash,
-                                    },
-                                    fullname: {
-                                        S: inputFname,
-                                    },
+                        let params = {
+                            TableName: 'users',
+                            Item: {
+                                name: {
+                                    S: inputData.username,
                                 },
-                            };
-                            // Add the new item to the users table
-                            db.putItem(params, function (err, data) {
-                                if (err) {
-                                    callback(
-                                        'Unable to add item. Error JSON:',
-                                        JSON.stringify(err, null, 2),
-                                        null
-                                    );
-                                } else {
-                                    console.log(
-                                        'Added item:',
-                                        JSON.stringify(data, null, 2)
-                                    );
-                                    callback(null, 'New account created.');
-                                }
-                            });
-                        }
+                                password: {
+                                    S: hash,
+                                },
+                                firstname: {
+                                    S: inputData.firstname,
+                                },
+                                lastname: {
+                                    S: inputData.lastname,
+                                },
+                                email: {
+                                    S: inputData.email,
+                                },
+                                affiliation: {
+                                    S: inputData.affiliation,
+                                },
+                                birthday: {
+                                    S: inputData.birthday,
+                                },
+                            },
+                        };
+                        // Add the new item to the users table
+                        db.putItem(params, function (err, data) {
+                            if (err) {
+                                callback(
+                                    'Unable to add item. Error JSON:',
+                                    JSON.stringify(err, null, 2),
+                                    null
+                                );
+                            } else {
+                                callback(null, 'New account created.');
+                            }
+                        });
                     }
                 }
             });

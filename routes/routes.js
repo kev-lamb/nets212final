@@ -52,17 +52,12 @@ var getSignup = function (req, res) {
 };
 
 var newAccCheck = function (req, res) {
-    let username = req.body.username.trim();
-    let password = req.body.password;
-    let fullname = req.body.fullname.trim();
-
-    db.new_acc_check(username, password, fullname, function (err, data) {
+    db.new_acc_check(req.body, function (err, data) {
         if (err) {
-            error = err;
             res.redirect('/signup?error=0');
         } else {
             if (!req.session.username) {
-                req.session.username = username;
+                req.session.username = req.body.username;
             }
             res.redirect('/');
         }
