@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Home</title>
+        <link
+            rel="stylesheet"
+            href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        />
+        <script
+            type="text/javascript"
+            src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
+        ></script>
+        <script src="home.js"></script>
+        <script src="formvalidation.js"></script>
+        <style>
+            body {
+                padding-top: 40px;
+                padding-bottom: 40px;
+                background-color: white;
+            }
+            .login-box {
+                max-width: 330px;
+                margin: 0 auto;
+            }
+            .login-box .form-control {
+                margin-bottom: 10px;
+            }
+            .incorrect {
+                border-color: red;
+            }
+        </style>
+    </head>
+    <body onload="populateDisplayById()">
+        <div class="login-box">
+            <h1>Edit Account Page</h1>
+            <i><h3 id="username"></h3></i>
+            <form
+                action="/account"
+                method="get"
+                onsubmit="return editAccountOnDB()"
+                autocomplete="off"
+            >
+                <label for="firstname">First Name:</label>
+                <input
+                    type="text"
+                    id="firstname"
+                    name="firstname"
+                    class="form-control"
+                    autocomplete="off"
+                />
+                <label for="lastname">Last Name:</label>
+                <input
+                    type="text"
+                    id="lastname"
+                    name="lastname"
+                    class="form-control"
+                />
+                <label for="email">Email Address:</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    class="form-control"
+                />
+
+                <label for="affiliation">Affiliation:</label>
+                <input
+                    type="text"
+                    id="affiliation"
+                    name="affiliation"
+                    class="form-control"
+                />
+
+                <label for="birthday">Birthday:</label>
+                <input
+                    type="date"
+                    id="birthday"
+                    name="birthday"
+                    class="form-control"
+                />
+                <input
+                    type="submit"
+                    value="Submit"
+                    class="btn btn-lg btn-primary btn-block"
+                />
+            </form>
+            <br />
+            <a href="/account">Back to account</a>
+        </div>
+    </body>
+</html>

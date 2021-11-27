@@ -29,6 +29,15 @@ app.post('/createaccount', routes.new_account_check);
 // check login page
 app.post('/checklogin', routes.login_check);
 
+// user account page
+app.get('/account', routes.user_account);
+
+// edit user account page
+app.get('/editaccount', routes.edit_user_account);
+
+// update user account db call
+app.post('/updateaccount', routes.update_account_check);
+
 // get user profile
 app.get('/data/userprofile', routes.get_user_profile);
 

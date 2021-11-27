@@ -16,7 +16,7 @@ var myDB_login_check = function (inputUname, inputPword, callback) {
         TableName: 'users',
         KeyConditionExpression: '#un = :uname',
         ExpressionAttributeNames: {
-            '#un': 'name',
+            '#un': 'username',
         },
         ExpressionAttributeValues: {
             ':uname': {
@@ -68,7 +68,7 @@ var myDB_new_acc_check = function (inputData, callback) {
         TableName: 'users',
         KeyConditionExpression: '#un = :uname',
         ExpressionAttributeNames: {
-            '#un': 'name',
+            '#un': 'username',
         },
         ExpressionAttributeValues: {
             ':uname': {
@@ -90,7 +90,7 @@ var myDB_new_acc_check = function (inputData, callback) {
                         let params = {
                             TableName: 'users',
                             Item: {
-                                name: {
+                                username: {
                                     S: inputData.username,
                                 },
                                 password: {
@@ -136,7 +136,7 @@ var myDB_data_user_profile = function (username, callback) {
     var params = {
         TableName: 'users',
         Key: {
-            name: {
+            username: {
                 S: username,
             },
         },
@@ -146,6 +146,34 @@ var myDB_data_user_profile = function (username, callback) {
     });
 };
 
+var update_user_profile = function (inputData, callback) {
+    let params = {
+        TableName: 'users',
+        Key: {
+            username: {
+                S: inputData.username,
+            },
+        },
+        UpdateExpression:
+            'set ' +
+            'firstname = :firstname, ' +
+            'lastname = :lastname, ' +
+            'email = :email,' +
+            'affiliation = :affiliation, ' +
+            'birthday = :birthday',
+        ExpressionAttributeValues: {
+            ':firstname': { S: inputData.firstname },
+            ':lastname': { S: inputData.lastname },
+            ':email': { S: inputData.email },
+            ':affiliation': { S: inputData.affiliation },
+            ':birthday': { S: inputData.birthday },
+        },
+        ReturnValues: 'UPDATED_NEW',
+    };
+    db.updateItem(params, function (err, data) {
+        callback(err, data);
+    });
+};
 async function sha256(message) {
     // encode as UTF-8
     const msgBuffer = new TextEncoder().encode(message);
@@ -166,6 +194,7 @@ var database = {
     login_check: myDB_login_check,
     new_acc_check: myDB_new_acc_check,
     get_user_profile_data: myDB_data_user_profile,
+    update_user_profile: update_user_profile,
 };
 
 module.exports = database;

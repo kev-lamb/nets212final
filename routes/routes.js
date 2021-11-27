@@ -64,6 +64,32 @@ var newAccCheck = function (req, res) {
     });
 };
 
+var getAccount = function (req, res) {
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        res.render('account.ejs');
+    }
+};
+
+var editAccount = function (req, res) {
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        res.render('editaccount.ejs');
+    }
+};
+
+var updateAccount = function (req, res) {
+    db.update_user_profile(req.body, function (err, data) {
+        if (err) {
+            res.redirect('/editaccount?error=0');
+        } else {
+            res.redirect('/account');
+        }
+    });
+};
+
 var loadUserProfile = function (req, res) {
     console.log('Fetching User Profile Data');
     if (!req.session.username) {
@@ -81,6 +107,9 @@ var routes = {
     signup_page: getSignup,
     new_account_check: newAccCheck,
     login_check: loginCheck,
+    user_account: getAccount,
+    edit_user_account: editAccount,
+    update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
 };
 
