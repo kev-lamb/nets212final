@@ -15,6 +15,8 @@ public class Config {
 	/**
 	 * The path to the space-delimited social network data
 	 */
+	public static String NEWS_FEED_PATH = "https://penn-cis545-files.s3.amazonaws.com/News_Category_Dataset_v2.json";
+	
 	public static String SOCIAL_NET_PATH = "s3a://penn-cis545-files/twitter_combined.txt";
 	
 	public static String BIGGER_SOCIAL_NET_PATH = "s3a://penn-cis545-files/soc-LiveJournal1.txt";
