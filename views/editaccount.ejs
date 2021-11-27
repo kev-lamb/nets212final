@@ -10,7 +10,7 @@
             type="text/javascript"
             src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
         ></script>
-        <script src="home.js"></script>
+        <script src="account.js"></script>
         <script src="formvalidation.js"></script>
         <style>
             body {
@@ -37,8 +37,9 @@
             <form
                 action="/account"
                 method="get"
-                onsubmit="return editAccountOnDB()"
+                onsubmit="return editAccountOnDB('notpassword')"
                 autocomplete="off"
+                id="notpassword"
             >
                 <label for="firstname">First Name:</label>
                 <input
@@ -70,12 +71,32 @@
                     name="affiliation"
                     class="form-control"
                 />
-
                 <label for="birthday">Birthday:</label>
                 <input
                     type="date"
                     id="birthday"
                     name="birthday"
+                    class="form-control"
+                />
+                <input
+                    type="submit"
+                    value="Submit"
+                    class="btn btn-lg btn-primary btn-block"
+                />
+            </form>
+            <br />
+            <form
+                action="/account"
+                method="get"
+                onsubmit="return editAccountOnDB('passwordform')"
+                autocomplete="off"
+                id="passwordform"
+            >
+                <label for="password">Password:</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
                     class="form-control"
                 />
                 <input

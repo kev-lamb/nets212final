@@ -1,5 +1,11 @@
-function FormValidation() {
-    var elements = document.querySelectorAll('input');
+function FormValidation(formId) {
+    var elements;
+    if (formId) {
+        console.log('in');
+        elements = document.getElementById(formId).querySelectorAll('input');
+    } else {
+        elements = document.querySelectorAll('input');
+    }
     var completed = true;
     for (var i = 0, element; (element = elements[i++]); ) {
         element.classList.remove('incorrect');
