@@ -147,49 +147,64 @@ var myDB_data_user_profile = function (username, callback) {
 };
 
 var update_user_profile = function (inputData, callback) {
-    let params = {
-        TableName: 'users',
-        Key: {
-            username: {
-                S: inputData.username,
+    let params = {};
+    console.log(inputData);
+    if (inputData.password) {
+        console.log('In data');
+        const saltRounds = 10;
+        bcrypt.hash(inputData.password, saltRounds).then((hash) => {
+            params = {
+                TableName: 'users',
+                Key: {
+                    username: {
+                        S: inputData.username,
+                    },
+                },
+                UpdateExpression: 'set password = :password',
+                ExpressionAttributeValues: {
+                    ':password': { S: hash },
+                },
+                ReturnValues: 'UPDATED_NEW',
+            };
+            db.updateItem(params, function (err, data) {
+                if (err) {
+                    console.log(err);
+                }
+                callback(err, data);
+            });
+        });
+    } else {
+        params = {
+            TableName: 'users',
+            Key: {
+                username: {
+                    S: inputData.username,
+                },
             },
-        },
-        UpdateExpression:
-            'set ' +
-            'firstname = :firstname, ' +
-            'lastname = :lastname, ' +
-            'email = :email,' +
-            'affiliation = :affiliation, ' +
-            'birthday = :birthday',
-        ExpressionAttributeValues: {
-            ':firstname': { S: inputData.firstname },
-            ':lastname': { S: inputData.lastname },
-            ':email': { S: inputData.email },
-            ':affiliation': { S: inputData.affiliation },
-            ':birthday': { S: inputData.birthday },
-        },
-        ReturnValues: 'UPDATED_NEW',
-    };
-    db.updateItem(params, function (err, data) {
-        callback(err, data);
-    });
+            UpdateExpression:
+                'set ' +
+                'firstname = :firstname, ' +
+                'lastname = :lastname, ' +
+                'email = :email,' +
+                'affiliation = :affiliation, ' +
+                'birthday = :birthday',
+            ExpressionAttributeValues: {
+                ':firstname': { S: inputData.firstname },
+                ':lastname': { S: inputData.lastname },
+                ':email': { S: inputData.email },
+                ':affiliation': { S: inputData.affiliation },
+                ':birthday': { S: inputData.birthday },
+            },
+            ReturnValues: 'UPDATED_NEW',
+        };
+        db.updateItem(params, function (err, data) {
+            if (err) {
+                console.log(err);
+            }
+            callback(err, data);
+        });
+    }
 };
-async function sha256(message) {
-    // encode as UTF-8
-    const msgBuffer = new TextEncoder().encode(message);
-
-    // hash the message
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-
-    // convert ArrayBuffer to Array
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-
-    // convert bytes to hex string
-    const hashHex = hashArray
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-    return hashHex;
-}
 var database = {
     login_check: myDB_login_check,
     new_acc_check: myDB_new_acc_check,

@@ -9,6 +9,7 @@
       "async": "*",
       "aws-sdk": "*",
       "bcrypt": "^5.0.1",
+      "bcrypto": "^5.4.0",
       "ejs": "*",
       "express": "*",
       "express-session": "^1.17.2",
