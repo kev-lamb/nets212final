@@ -25,7 +25,8 @@ Route to the wall of a particular user.
 A request to this route should have the user_id of the user whose wall is being requested.
 TODO: Implement
  */
-var getWall = function (req, res) {};
+var getWall = function (req, res) {
+};
 
 // Route to the login page
 var getLogin = function (req, res) {
