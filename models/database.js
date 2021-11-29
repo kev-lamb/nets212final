@@ -1,5 +1,5 @@
 var AWS = require('aws-sdk');
-AWS.config.update({ region: 'us-east-1' });
+AWS.config.update({region:'us-east-1'});
 var db = new AWS.DynamoDB();
 const bcrypt = require('bcrypt');
 
@@ -205,11 +205,186 @@ var update_user_profile = function (inputData, callback) {
         });
     }
 };
-var database = {
-    login_check: myDB_login_check,
-    new_acc_check: myDB_new_acc_check,
-    get_user_profile_data: myDB_data_user_profile,
-    update_user_profile: update_user_profile,
+
+var myDB_get_posts_wall = function(user, callback) {
+  console.log('Beginning post table scan.'); 
+
+  //get posts to user
+  params = {
+	TableName : "posts",
+	KeyConditionExpression: 'postee = :user',
+	ExpressionAttributeValues: {
+	  ':user' : {'S': user}
+	}
+  }
+
+  db.query(params, function(err, data) {
+	if (err) {
+		callback(err, null);
+	} else {
+		for (var i = 0; i < data.length; i++) {
+			if (data.Items[i].poster.S != data.Items[i].postee.S) {
+				out.push(data.Items[i]);
+			}
+		}
+	}
+  });
+
+  //get posts from user
+  params = {
+	TableName : "posts",
+	IndexName : "poster-postid-index",
+	KeyConditionExpression: 'poster = :user',
+	ExpressionAttributeValues: {
+	  ':user' : {'S': user}
+	}
+  }
+
+  db.query(params, function(err, data) {
+	if (err) {
+		callback(err, null);
+	} else {
+		for (var i = 0; i < data.Items.length; i++) {
+			out.push(data.Items[j]);
+		}
+	}
+  });
+
+  callback(null, out);
+}
+
+var myDB_get_posts_homepage = function(user, callback) {
+  console.log('Beginning post table scan.'); 
+
+  var friends = [];
+  var out = [];  
+
+  //get users friends
+  let params = {
+	TableName: "friends",
+	KeyConditionExpression: "user = :user",
+	ExpressionAttributeValues: {
+		':user' : {'S': user}
+	}
+  }
+
+  db.query(params, function(err, data) {
+	if (err) {
+		callback(err, null);
+	} else {
+		var friends = [];
+		for (var i = 0; i < data.Items.length; i++) {
+			params = {
+				TableName: "posts",
+				KeyConditionExpression: "postee = :user",
+				ExpressionAttributeValues: {
+					':user' : {'S': data.Items[i].friend.S}
+				}
+			}
+			db.query(params, function(err, data2) {
+			  if (err) {
+		  		  callback(err, null);
+			  } else {
+				  for (var j = 0; j < data2.Items.length; j++) {
+					if (data2.Items[j].poster.S == data.Items[i].friend.S && data2.items[j].postee != user) {
+						out.push(data2.Items[j]);
+					}
+				  }
+			  }
+		    });
+		}
+	}
+  });
+
+  //get posts to user
+  params = {
+	TableName : "posts",
+	KeyConditionExpression: 'postee = :user',
+	ExpressionAttributeValues: {
+	  ':user' : {'S': user}
+	}
+  }
+
+  db.query(params, function(err, data) {
+	if (err) {
+		callback(err, null);
+	} else {
+		for (var i = 0; i < data.length; i++) {
+			if (data.Items[i].poster.S != data.Items[i].postee.S) {
+				out.push(data.Items[i]);
+			}
+		}
+	}
+  });
+
+  //get posts from user
+  params = {
+	TableName : "posts",
+	IndexName : "poster-postid-index",
+	KeyConditionExpression: 'poster = :user',
+	ExpressionAttributeValues: {
+	  ':user' : {'S': user}
+	}
+  }
+
+  db.query(params, function(err, data) {
+	if (err) {
+		callback(err, null);
+	} else {
+		for (var i = 0; i < data.Items.length; i++) {
+			out.push(data.Items[j]);
+		}
+	}
+  });
+
+  callback(null, out);
+}
+
+var myDB_post = function (title, content, poster, postee, callback) {
+	let current = new Date();
+	let cDate = current.getFullYear() + '-' + (current.getMonth() + 1) + '-' + current.getDate();
+	let cTime = current.getHours() + ":" + current.getMinutes() + ":" + current.getSeconds();
+	let dateTime = cDate + ' ' + cTime;
+	let params = {
+                            TableName: 'posts',
+                            Item: {
+                                title: {
+                                    S: title,
+                                },
+                                content: {
+                                    S: content,
+                                },
+                                poster: {
+                                    S: poster,
+                                },
+                                postee: {
+                                    S: postee,
+                                },
+                                time: {
+									S: dateTime
+								},
+								postid: {
+									S: poster + cTime
+								}
+                            },
+                        };
+	db.putItem(params, function(err, data) {
+        if (err) {
+            console.log(err);
+        }
+        callback(err, data);		
+	});
+}
+
+var database = { 
+  login_check: myDB_login_check,
+  new_acc_check: myDB_new_acc_check,
+  get_user_profile_data: myDB_data_user_profile,
+  update_user_profile: update_user_profile,
+  get_posts_w: myDB_get_posts_wall,
+  get_posts_hp: myDB_get_posts_homepage,
+  new_post: myDB_post
 };
 
 module.exports = database;
+                                        
