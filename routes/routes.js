@@ -101,6 +101,27 @@ var loadUserProfile = function (req, res) {
     }
 };
 
+/*
+Fetches a specific subset of chats
+Typical usecase is to get all chats that the logged in user is a part of
+Can be expanded for other uses if needed
+*/
+var getChats = function (req, res) {
+	if(!req.session.username) {
+		//not logged in, redirect to login page
+		res.redirect('/login?error=0');
+	} else {
+		db.get_users_chats(req.session.username, function(err, data) {
+			if (err) {
+				res.send(null);
+			} else {
+				res.send(data);
+			}
+		});
+	}
+	
+};
+
 var routes = {
     home_page: getHome,
     login_page: getLogin,
@@ -111,6 +132,7 @@ var routes = {
     edit_user_account: editAccount,
     update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
+	get_chats: getChats,
 };
 
 module.exports = routes;

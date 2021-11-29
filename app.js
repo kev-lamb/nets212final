@@ -41,6 +41,9 @@ app.post('/updateaccount', routes.update_account_check);
 // get user profile
 app.get('/data/userprofile', routes.get_user_profile);
 
+// get a specific subset of chats
+app.get('/chats', routes.get_chats);
+
 console.log('Author: G31');
 app.listen(8080);
 console.log(

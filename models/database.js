@@ -376,6 +376,27 @@ var myDB_post = function (title, content, poster, postee, callback) {
 	});
 }
 
+var get_users_chats = function (user, callback) {
+	
+	//get chats containing user
+  	params = {
+		TableName : "chats",
+		IndexName : "sortkey-chatID-index",
+		KeyConditionExpression: 'sortkey = :user',
+		ExpressionAttributeValues: {
+	  		':user' : {'S': 'member_' + user}
+		}
+  	}
+
+	db.query(params, function(err, data) {
+		if (err) {
+			callback(err, null);
+		} else {
+			callback(err, data.Items);
+		}
+  	});	
+}
+
 var database = { 
   login_check: myDB_login_check,
   new_acc_check: myDB_new_acc_check,
@@ -383,7 +404,8 @@ var database = {
   update_user_profile: update_user_profile,
   get_posts_w: myDB_get_posts_wall,
   get_posts_hp: myDB_get_posts_homepage,
-  new_post: myDB_post
+  new_post: myDB_post,
+  get_users_chats: get_users_chats,
 };
 
 module.exports = database;
