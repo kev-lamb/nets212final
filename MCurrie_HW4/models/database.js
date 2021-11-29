@@ -340,7 +340,7 @@ var myDB_get_posts_homepage = function(user, callback) {
   callback(null, out);
 }
 
-var db_post = function (title, content, poster, postee, callback) {
+var myDB_post = function (title, content, poster, postee, callback) {
 	let current = new Date();
 	let cDate = current.getFullYear() + '-' + (current.getMonth() + 1) + '-' + current.getDate();
 	let cTime = current.getHours() + ":" + current.getMinutes() + ":" + current.getSeconds();
@@ -382,7 +382,8 @@ var database = {
   get_user_profile_data: myDB_data_user_profile,
   update_user_profile: update_user_profile,
   get_posts_w: myDB_get_posts_wall,
-  get_posts_hp: myDB_get_posts_homepage
+  get_posts_hp: myDB_get_posts_homepage,
+  new_post: myDB_post
 };
 
 module.exports = database;
