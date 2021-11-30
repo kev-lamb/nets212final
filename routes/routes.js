@@ -115,7 +115,7 @@ var getChats = function (req, res) {
 			if (err) {
 				res.send(null);
 			} else {
-				res.send(data);
+				res.send(JSON.stringify(data));
 			}
 		});
 	}
