@@ -216,17 +216,14 @@ var myDB_get_posts_wall = function (user, callback) {
         ExpressionAttributeValues: {
             ':user': { S: user },
         },
+        FilterExpression: 'poster != :user',
     };
 
     db.query(params, function (err, data) {
         if (err) {
             callback(err, null);
         } else {
-            for (var i = 0; i < data.length; i++) {
-                if (data.Items[i].poster.S != data.Items[i].postee.S) {
-                    out.push(data.Items[i]);
-                }
-            }
+            out.concat(data.Items);
         }
     });
 
@@ -244,9 +241,7 @@ var myDB_get_posts_wall = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            for (var i = 0; i < data.Items.length; i++) {
-                out.push(data.Items[j]);
-            }
+            out.concat(data.Items);
         }
     });
 
@@ -256,7 +251,6 @@ var myDB_get_posts_wall = function (user, callback) {
 var myDB_get_posts_homepage = function (user, callback) {
     console.log('Beginning post table scan.');
 
-    var friends = [];
     var out = [];
 
     //get users friends
@@ -272,28 +266,22 @@ var myDB_get_posts_homepage = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            var friends = [];
             for (var i = 0; i < data.Items.length; i++) {
                 params = {
                     TableName: 'posts',
-                    KeyConditionExpression: 'postee = :user',
+                    IndexName: 'poster-postid-index',
+                    KeyConditionExpression: 'poster = :friend',
+                    FilterExpression: 'postee != :user',
                     ExpressionAttributeValues: {
-                        ':user': { S: data.Items[i].friend.S },
+                        ':friend': { S: data.Items[i].friend.S },
+                        ':user': { S: user },
                     },
                 };
                 db.query(params, function (err, data2) {
                     if (err) {
                         callback(err, null);
                     } else {
-                        for (var j = 0; j < data2.Items.length; j++) {
-                            if (
-                                data2.Items[j].poster.S ==
-                                    data.Items[i].friend.S &&
-                                data2.items[j].postee != user
-                            ) {
-                                out.push(data2.Items[j]);
-                            }
-                        }
+                        out.concat(data2.Items);
                     }
                 });
             }
@@ -304,6 +292,7 @@ var myDB_get_posts_homepage = function (user, callback) {
     params = {
         TableName: 'posts',
         KeyConditionExpression: 'postee = :user',
+        FilterExpression: 'poster != :user',
         ExpressionAttributeValues: {
             ':user': { S: user },
         },
@@ -313,11 +302,7 @@ var myDB_get_posts_homepage = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            for (var i = 0; i < data.length; i++) {
-                if (data.Items[i].poster.S != data.Items[i].postee.S) {
-                    out.push(data.Items[i]);
-                }
-            }
+            out.concat(data.Items);
         }
     });
 
@@ -335,9 +320,7 @@ var myDB_get_posts_homepage = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            for (var i = 0; i < data.Items.length; i++) {
-                out.push(data.Items[j]);
-            }
+            out.concat(data.Items);
         }
     });
 
