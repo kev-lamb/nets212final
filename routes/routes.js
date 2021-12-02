@@ -46,7 +46,7 @@ var loginCheck = function (req, res) {
 };
 
 // [signup] index based url query custom error messages
-let signupError = ['Sign Up Information Incorrect'];
+let signupError = ['Username taken/Sign Up Information Incorrect'];
 var getSignup = function (req, res) {
     res.render('signup.ejs', { errorMessage: signupError[req.query.error] });
 };
@@ -60,6 +60,15 @@ var newAccCheck = function (req, res) {
                 req.session.username = req.body.username;
             }
             res.redirect('/');
+            for (let i = 1; i <= req.session.username.length; i++) {
+                let sub = req.session.username.substring(0, i);
+                db.post_partial_search(sub, req.session.username, function () {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                    }
+                });
+            }
         }
     });
 };
@@ -101,25 +110,61 @@ var loadUserProfile = function (req, res) {
     }
 };
 
+var searchForUsers = function (req, res) {
+    console.log('Searching for users');
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        res.render('search.ejs');
+    }
+};
+
+var loadPartialUserList = function (req, res) {
+    console.log('Fetching partial users');
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        db.get_partial_users(req.body.searchTerm, function (err, data) {
+            res.send(JSON.stringify(data));
+        });
+    }
+};
+
+/*var loadAllUserList = function (req, res) {
+    console.log('Fetching all users');
+    console.log(req.body);
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        db.get_all_users(req.body.searchTerm, function (err, data) {
+            res.send(JSON.stringify(data));
+        });
+    }
+};*/
+
 /*
 Fetches a specific subset of chats
 Typical usecase is to get all chats that the logged in user is a part of
 Can be expanded for other uses if needed
 */
 var getChats = function (req, res) {
-	if(!req.session.username) {
-		//not logged in, redirect to login page
-		res.redirect('/login?error=0');
-	} else {
-		db.get_users_chats(req.session.username, function(err, data) {
-			if (err) {
-				res.send(null);
-			} else {
-				res.send(JSON.stringify(data));
-			}
-		});
-	}
-	
+    if (!req.session.username) {
+        //not logged in, redirect to login page
+        res.redirect('/login?error=0');
+    } else {
+        db.get_users_chats(req.session.username, function (err, data) {
+            if (err) {
+                res.send(null);
+            } else {
+                res.send(JSON.stringify(data));
+            }
+        });
+    }
+};
+
+var signout = function (req, res) {
+    req.session.username = '';
+    res.redirect('/');
 };
 
 var testChats = function (req, res) {
@@ -192,6 +237,10 @@ var routes = {
 	get_chat: openChat,
 	get_messages: getMessages,
 	send_message: sendMessage,
+    get_search_users: searchForUsers,
+    get_partial_search_users: loadPartialUserList,
+    get_chats: getChats,
+    signout: signout,
 };
 
 module.exports = routes;

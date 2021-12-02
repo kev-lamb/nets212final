@@ -1,7 +1,6 @@
 function FormValidation(formId) {
     var elements;
     if (formId) {
-        console.log('in');
         elements = document.getElementById(formId).querySelectorAll('input');
     } else {
         elements = document.querySelectorAll('input');
