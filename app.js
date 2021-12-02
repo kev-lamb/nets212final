@@ -44,6 +44,18 @@ app.get('/data/userprofile', routes.get_user_profile);
 // get a specific subset of chats
 app.get('/chats', routes.get_chats);
 
+// get search page
+app.get('/search', routes.get_search_users);
+
+// post partial search results
+app.post('/partialsearch', routes.get_partial_search_users);
+
+// post all search results
+app.post('/allsearch', routes.get_all_search_users);
+
+// post signout
+app.get('/signout', routes.signout);
+
 console.log('Author: G31');
 app.listen(8080);
 console.log(

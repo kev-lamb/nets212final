@@ -1,5 +1,5 @@
 var AWS = require('aws-sdk');
-AWS.config.update({region:'us-east-1'});
+AWS.config.update({ region: 'us-east-1' });
 var db = new AWS.DynamoDB();
 const bcrypt = require('bcrypt');
 
@@ -206,207 +206,324 @@ var update_user_profile = function (inputData, callback) {
     }
 };
 
-var myDB_get_posts_wall = function(user, callback) {
-  console.log('Beginning post table scan.'); 
+var myDB_get_posts_wall = function (user, callback) {
+    console.log('Beginning post table scan.');
 
-  //get posts to user
-  params = {
-	TableName : "posts",
-	KeyConditionExpression: 'postee = :user',
-	ExpressionAttributeValues: {
-	  ':user' : {'S': user}
-	}
-  }
+    //get posts to user
+    params = {
+        TableName: 'posts',
+        KeyConditionExpression: 'postee = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: user },
+        },
+    };
 
-  db.query(params, function(err, data) {
-	if (err) {
-		callback(err, null);
-	} else {
-		for (var i = 0; i < data.length; i++) {
-			if (data.Items[i].poster.S != data.Items[i].postee.S) {
-				out.push(data.Items[i]);
-			}
-		}
-	}
-  });
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            for (var i = 0; i < data.length; i++) {
+                if (data.Items[i].poster.S != data.Items[i].postee.S) {
+                    out.push(data.Items[i]);
+                }
+            }
+        }
+    });
 
-  //get posts from user
-  params = {
-	TableName : "posts",
-	IndexName : "poster-postid-index",
-	KeyConditionExpression: 'poster = :user',
-	ExpressionAttributeValues: {
-	  ':user' : {'S': user}
-	}
-  }
+    //get posts from user
+    params = {
+        TableName: 'posts',
+        IndexName: 'poster-postid-index',
+        KeyConditionExpression: 'poster = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: user },
+        },
+    };
 
-  db.query(params, function(err, data) {
-	if (err) {
-		callback(err, null);
-	} else {
-		for (var i = 0; i < data.Items.length; i++) {
-			out.push(data.Items[j]);
-		}
-	}
-  });
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            for (var i = 0; i < data.Items.length; i++) {
+                out.push(data.Items[j]);
+            }
+        }
+    });
 
-  callback(null, out);
-}
+    callback(null, out);
+};
 
-var myDB_get_posts_homepage = function(user, callback) {
-  console.log('Beginning post table scan.'); 
+var myDB_get_posts_homepage = function (user, callback) {
+    console.log('Beginning post table scan.');
 
-  var friends = [];
-  var out = [];  
+    var friends = [];
+    var out = [];
 
-  //get users friends
-  let params = {
-	TableName: "friends",
-	KeyConditionExpression: "user = :user",
-	ExpressionAttributeValues: {
-		':user' : {'S': user}
-	}
-  }
+    //get users friends
+    let params = {
+        TableName: 'friends',
+        KeyConditionExpression: 'user = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: user },
+        },
+    };
 
-  db.query(params, function(err, data) {
-	if (err) {
-		callback(err, null);
-	} else {
-		var friends = [];
-		for (var i = 0; i < data.Items.length; i++) {
-			params = {
-				TableName: "posts",
-				KeyConditionExpression: "postee = :user",
-				ExpressionAttributeValues: {
-					':user' : {'S': data.Items[i].friend.S}
-				}
-			}
-			db.query(params, function(err, data2) {
-			  if (err) {
-		  		  callback(err, null);
-			  } else {
-				  for (var j = 0; j < data2.Items.length; j++) {
-					if (data2.Items[j].poster.S == data.Items[i].friend.S && data2.items[j].postee != user) {
-						out.push(data2.Items[j]);
-					}
-				  }
-			  }
-		    });
-		}
-	}
-  });
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            var friends = [];
+            for (var i = 0; i < data.Items.length; i++) {
+                params = {
+                    TableName: 'posts',
+                    KeyConditionExpression: 'postee = :user',
+                    ExpressionAttributeValues: {
+                        ':user': { S: data.Items[i].friend.S },
+                    },
+                };
+                db.query(params, function (err, data2) {
+                    if (err) {
+                        callback(err, null);
+                    } else {
+                        for (var j = 0; j < data2.Items.length; j++) {
+                            if (
+                                data2.Items[j].poster.S ==
+                                    data.Items[i].friend.S &&
+                                data2.items[j].postee != user
+                            ) {
+                                out.push(data2.Items[j]);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    });
 
-  //get posts to user
-  params = {
-	TableName : "posts",
-	KeyConditionExpression: 'postee = :user',
-	ExpressionAttributeValues: {
-	  ':user' : {'S': user}
-	}
-  }
+    //get posts to user
+    params = {
+        TableName: 'posts',
+        KeyConditionExpression: 'postee = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: user },
+        },
+    };
 
-  db.query(params, function(err, data) {
-	if (err) {
-		callback(err, null);
-	} else {
-		for (var i = 0; i < data.length; i++) {
-			if (data.Items[i].poster.S != data.Items[i].postee.S) {
-				out.push(data.Items[i]);
-			}
-		}
-	}
-  });
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            for (var i = 0; i < data.length; i++) {
+                if (data.Items[i].poster.S != data.Items[i].postee.S) {
+                    out.push(data.Items[i]);
+                }
+            }
+        }
+    });
 
-  //get posts from user
-  params = {
-	TableName : "posts",
-	IndexName : "poster-postid-index",
-	KeyConditionExpression: 'poster = :user',
-	ExpressionAttributeValues: {
-	  ':user' : {'S': user}
-	}
-  }
+    //get posts from user
+    params = {
+        TableName: 'posts',
+        IndexName: 'poster-postid-index',
+        KeyConditionExpression: 'poster = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: user },
+        },
+    };
 
-  db.query(params, function(err, data) {
-	if (err) {
-		callback(err, null);
-	} else {
-		for (var i = 0; i < data.Items.length; i++) {
-			out.push(data.Items[j]);
-		}
-	}
-  });
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            for (var i = 0; i < data.Items.length; i++) {
+                out.push(data.Items[j]);
+            }
+        }
+    });
 
-  callback(null, out);
-}
+    callback(null, out);
+};
 
 var myDB_post = function (title, content, poster, postee, callback) {
-	let current = new Date();
-	let cDate = current.getFullYear() + '-' + (current.getMonth() + 1) + '-' + current.getDate();
-	let cTime = current.getHours() + ":" + current.getMinutes() + ":" + current.getSeconds();
-	let dateTime = cDate + ' ' + cTime;
-	let params = {
-                            TableName: 'posts',
-                            Item: {
-                                title: {
-                                    S: title,
-                                },
-                                content: {
-                                    S: content,
-                                },
-                                poster: {
-                                    S: poster,
-                                },
-                                postee: {
-                                    S: postee,
-                                },
-                                time: {
-									S: dateTime
-								},
-								postid: {
-									S: poster + cTime
-								}
-                            },
-                        };
-	db.putItem(params, function(err, data) {
+    let current = new Date();
+    let cDate =
+        current.getFullYear() +
+        '-' +
+        (current.getMonth() + 1) +
+        '-' +
+        current.getDate();
+    let cTime =
+        current.getHours() +
+        ':' +
+        current.getMinutes() +
+        ':' +
+        current.getSeconds();
+    let dateTime = cDate + ' ' + cTime;
+    let params = {
+        TableName: 'posts',
+        Item: {
+            title: {
+                S: title,
+            },
+            content: {
+                S: content,
+            },
+            poster: {
+                S: poster,
+            },
+            postee: {
+                S: postee,
+            },
+            time: {
+                S: dateTime,
+            },
+            postid: {
+                S: poster + cTime,
+            },
+        },
+    };
+    db.putItem(params, function (err, data) {
         if (err) {
             console.log(err);
         }
-        callback(err, data);		
-	});
-}
+        callback(err, data);
+    });
+};
 
 var get_users_chats = function (user, callback) {
-	
-	//get chats containing user
-  	params = {
-		TableName : "chats",
-		IndexName : "sortkey-chatID-index",
-		KeyConditionExpression: 'sortkey = :user',
-		ExpressionAttributeValues: {
-	  		':user' : {'S': 'member_' + user}
-		}
-  	}
+    //get chats containing user
+    params = {
+        TableName: 'chats',
+        IndexName: 'sortkey-chatID-index',
+        KeyConditionExpression: 'sortkey = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: 'member_' + user },
+        },
+    };
 
-	db.query(params, function(err, data) {
-		if (err) {
-			callback(err, null);
-		} else {
-			callback(err, data.Items);
-		}
-  	});	
-}
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data.Items);
+        }
+    });
+};
 
-var database = { 
-  login_check: myDB_login_check,
-  new_acc_check: myDB_new_acc_check,
-  get_user_profile_data: myDB_data_user_profile,
-  update_user_profile: update_user_profile,
-  get_posts_w: myDB_get_posts_wall,
-  get_posts_hp: myDB_get_posts_homepage,
-  new_post: myDB_post,
-  get_users_chats: get_users_chats,
+var myDB_search_partial_update = function (
+    partialUsername,
+    username,
+    callback
+) {
+    console.log('Posting partial: ' + partialUsername);
+    let params = {
+        TableName: 'search',
+        Key: {
+            username: { S: partialUsername },
+        },
+    };
+
+    db.getItem(params, function (err, data) {
+        console.log(err, data);
+        if (err) {
+            callback(err, null);
+        } else {
+            if (data.Item) {
+                let results = data.Item.results.L;
+                console.log(results);
+                results.push({ S: username });
+                results.sort((a, b) => a.S.localeCompare(b.S));
+                if (results.length > 10) results.pop();
+                params = {
+                    TableName: 'search',
+                    Key: {
+                        username: {
+                            S: partialUsername,
+                        },
+                    },
+                    UpdateExpression: 'set results = :results',
+                    ExpressionAttributeValues: {
+                        ':results': { L: results },
+                    },
+                    ReturnValues: 'UPDATED_NEW',
+                };
+                db.updateItem(params, function (err, data) {
+                    if (err) {
+                        console.log(err);
+                    }
+                    callback(err, data);
+                });
+            } else if (!data.Item) {
+                params = {
+                    TableName: 'search',
+                    Item: {
+                        username: {
+                            S: partialUsername,
+                        },
+                        results: {
+                            L: [{ S: username }],
+                        },
+                    },
+                };
+                console.log(params);
+                db.putItem(params, function (err, data) {
+                    if (err) {
+                        console.log(err);
+                    }
+                    callback(err, data);
+                });
+            }
+        }
+    });
+};
+
+var myDB_search_partial = function (searchTerm, callback) {
+    console.log('search partial');
+    let params = {
+        TableName: 'search',
+        Key: {
+            username: { S: searchTerm },
+        },
+    };
+    console.log(params);
+    db.getItem(params, function (err, data) {
+        console.log(err, data);
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var myDB_search_all = function (searchTerm, callback) {
+    let params = {
+        TableName: 'users',
+    };
+    db.scan(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            let filtered = data.Items.filter((item) => {
+                return item.username.S.startsWith(searchTerm);
+            });
+            callback(err, filtered);
+        }
+    });
+};
+
+var database = {
+    login_check: myDB_login_check,
+    new_acc_check: myDB_new_acc_check,
+    get_user_profile_data: myDB_data_user_profile,
+    update_user_profile: update_user_profile,
+    get_posts_w: myDB_get_posts_wall,
+    get_posts_hp: myDB_get_posts_homepage,
+    new_post: myDB_post,
+    get_users_chats: get_users_chats,
+    get_partial_users: myDB_search_partial,
+    get_all_users: myDB_search_all,
+    post_partial_search: myDB_search_partial_update,
 };
 
 module.exports = database;
-                                        

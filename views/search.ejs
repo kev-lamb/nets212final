@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Home</title>
+        <link
+            rel="stylesheet"
+            href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        />
+        <script
+            type="text/javascript"
+            src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
+        ></script>
+        <script src="search.js"></script>
+        <script src="formvalidation.js"></script>
+        <style>
+            body {
+                padding-top: 40px;
+                padding-bottom: 40px;
+                background-color: white;
+            }
+            .main-box {
+                width: 330px;
+                margin: 0 auto;
+            }
+            .incorrect {
+                border-color: red;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="main-box">
+            <form
+                onsubmit="loadAll(); return false;"
+                autocomplete="off"
+                id="notpassword"
+            >
+                <label for="search">Search User:</label>
+                <input
+                    id="searchField"
+                    type="search"
+                    maxlength="10"
+                    oninput="partialAutoCompelete()"
+                />
+                <div id="suggested"></div>
+                <input
+                    type="submit"
+                    value="Search All"
+                    class="btn btn-lg btn-primary btn-block w-25"
+                    size="small"
+                />
+            </form>
+            <div id="queryResults"></div>
+            <a href="/">Back</a>
+        </div>
+    </body>
+</html>
