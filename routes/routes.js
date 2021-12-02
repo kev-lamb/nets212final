@@ -130,7 +130,7 @@ var loadPartialUserList = function (req, res) {
     }
 };
 
-var loadAllUserList = function (req, res) {
+/*var loadAllUserList = function (req, res) {
     console.log('Fetching all users');
     console.log(req.body);
     if (!req.session.username) {
@@ -140,7 +140,7 @@ var loadAllUserList = function (req, res) {
             res.send(JSON.stringify(data));
         });
     }
-};
+};*/
 
 /*
 Fetches a specific subset of chats
@@ -179,7 +179,6 @@ var routes = {
     get_user_profile: loadUserProfile,
     get_search_users: searchForUsers,
     get_partial_search_users: loadPartialUserList,
-    get_all_search_users: loadAllUserList,
     get_chats: getChats,
     signout: signout,
 };

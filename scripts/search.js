@@ -5,17 +5,17 @@ function loadAll() {
         searchTerm: searchTerm,
     };
     document.getElementById('suggested').innerHTML = '';
-    $.post('/allsearch', data, function (results) {
+    $.post('/partialsearch', data, function (results) {
         let parsed = JSON.parse(results);
-        let content = '<h3>Results:</h3>';
-        if (parsed.length > 0) {
-            for (result of parsed) {
-                content += `<a href="/search" style="display: block">${result.username.S}</a>`;
+        let content = '<h4>Suggested:</h4>';
+        if (parsed.Item) {
+            let arr = parsed.Item.results.L;
+            for (result of arr) {
+                content += `<a href="/search" style="display: block">${result.S}</a>`;
             }
         } else {
-            content += '<p>No results</p>';
+            content += '<p>None</p>';
         }
-
         document.getElementById('queryResults').innerHTML = content;
     });
     return true;

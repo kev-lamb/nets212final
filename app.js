@@ -51,7 +51,7 @@ app.get('/search', routes.get_search_users);
 app.post('/partialsearch', routes.get_partial_search_users);
 
 // post all search results
-app.post('/allsearch', routes.get_all_search_users);
+//app.post('/allsearch', routes.get_all_search_users);
 
 // post signout
 app.get('/signout', routes.signout);

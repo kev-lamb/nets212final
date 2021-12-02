@@ -148,9 +148,7 @@ var myDB_data_user_profile = function (username, callback) {
 
 var update_user_profile = function (inputData, callback) {
     let params = {};
-    console.log(inputData);
     if (inputData.password) {
-        console.log('In data');
         const saltRounds = 10;
         bcrypt.hash(inputData.password, saltRounds).then((hash) => {
             params = {
@@ -407,7 +405,6 @@ var myDB_search_partial_update = function (
     };
 
     db.getItem(params, function (err, data) {
-        console.log(err, data);
         if (err) {
             callback(err, null);
         } else {
@@ -468,9 +465,7 @@ var myDB_search_partial = function (searchTerm, callback) {
             username: { S: searchTerm },
         },
     };
-    console.log(params);
     db.getItem(params, function (err, data) {
-        console.log(err, data);
         if (err) {
             callback(err, null);
         } else {
@@ -479,7 +474,7 @@ var myDB_search_partial = function (searchTerm, callback) {
     });
 };
 
-var myDB_search_all = function (searchTerm, callback) {
+/*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
     };
@@ -493,7 +488,7 @@ var myDB_search_all = function (searchTerm, callback) {
             callback(err, filtered);
         }
     });
-};
+};*/
 
 var database = {
     login_check: myDB_login_check,
@@ -505,7 +500,6 @@ var database = {
     new_post: myDB_post,
     get_users_chats: get_users_chats,
     get_partial_users: myDB_search_partial,
-    get_all_users: myDB_search_all,
     post_partial_search: myDB_search_partial_update,
 };
 
