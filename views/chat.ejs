@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Home</title>
+        <link
+            rel="stylesheet"
+            href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        />
+        <script
+            type="text/javascript"
+            src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
+        ></script>
+        <script src="chat.js"></script>
+    </head>
+    <body onload="populate_chat_onLoad(<%=chatid%>)">
+    <p> Chat Log</p>
+    <div id="chatid"> <%=chatid %></div>
+    <table id="display"> </table>
+    
+    <form onsubmit="send_message(<%=chatid%>)" id="message_form">
+    	<input type="text" id="new_message" name="new_message">
+    	<input type="submit" value="Create" id="submit>
+  </form>
+    
+    </body>
+</html>

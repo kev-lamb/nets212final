@@ -122,6 +122,61 @@ var getChats = function (req, res) {
 	
 };
 
+var testChats = function (req, res) {
+	res.render('chats.ejs');
+}
+
+var openChat = function (req, res) {
+	if(!req.session.username) {
+		//users need to be logged in to access chats
+		res.redirect('/login?error=0');
+	} else {
+		//if no chat id is specified in the query, redirect to the page of all users chats
+		if(!req.query.chatid) {
+			res.redirect('/testchat');
+		} else {
+			//check if the user is in the chat
+			db.in_chat(req.session.username, req.query.chatid, function(err, data) {
+				if(data) {
+					//user is in the group, fetch the messages from this group and display them
+					db.get_chat(req.query.chatid, function(err, data) {
+						res.render('chat.ejs', {messages: data, chatid: req.query.chatid});
+					});
+					
+				} else {
+					//user is not in the group/doesnt have permission, so redirect to the list of their chats
+					res.redirect('/testchat');
+				}
+			})
+		}
+	}
+};
+
+var getMessages = function(req, res) {
+	if(!req.query.chatid) {
+		res.send(null);
+	} else {
+		db.get_chat(req.query.chatid, function(err, data) {
+			res.send(data);
+		});
+	}
+};
+
+var sendMessage = function(req, res) {
+	console.log("we are in the post function");
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		db.send_message(req.body.chatid, req.body.message, req.session.username, function(err, data) {
+			if(err) {
+				res.send(null);
+			} else {
+				res.send('success');
+			}
+		});
+	}
+};
+
 var routes = {
     home_page: getHome,
     login_page: getLogin,
@@ -133,6 +188,10 @@ var routes = {
     update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
 	get_chats: getChats,
+	test_chats: testChats,
+	get_chat: openChat,
+	get_messages: getMessages,
+	send_message: sendMessage,
 };
 
 module.exports = routes;

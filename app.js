@@ -41,8 +41,20 @@ app.post('/updateaccount', routes.update_account_check);
 // get user profile
 app.get('/data/userprofile', routes.get_user_profile);
 
+//get messages from a chat
+app.get('/data/chat', routes.get_messages);
+
+//post a message to the database
+app.post('/sendmessage', routes.send_message);
+
 // get a specific subset of chats
 app.get('/chats', routes.get_chats);
+
+//go to the page of a specific chat
+app.get('/chat', routes.get_chat);
+
+//dummy route to test chat functionality
+app.get('/testchat', routes.test_chats);
 
 console.log('Author: G31');
 app.listen(8080);

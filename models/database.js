@@ -2,6 +2,7 @@ var AWS = require('aws-sdk');
 AWS.config.update({region:'us-east-1'});
 var db = new AWS.DynamoDB();
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 // Verify that the provided login information matches an item in the users table
 var myDB_login_check = function (inputUname, inputPword, callback) {
@@ -377,7 +378,8 @@ var myDB_post = function (title, content, poster, postee, callback) {
 }
 
 var get_users_chats = function (user, callback) {
-	
+	console.log("looking for chats containing user");
+	console.log(user);
 	//get chats containing user
   	params = {
 		TableName : "chats",
@@ -392,10 +394,101 @@ var get_users_chats = function (user, callback) {
 		if (err) {
 			callback(err, null);
 		} else {
+			console.log("found chats");
+			console.log(data);
 			callback(err, data.Items);
 		}
   	});	
-}
+};
+
+/**
+Searches the Chats table for specific chat and checks if the given user is in the chat.
+If the user is in the chat, data contains TRUE. Otherwise, data contains FALSE */
+var in_chat = function(user, chatid, callback) {
+	console.log("checking if user "+user+" has access to chat with id "+chatid);
+	params = {
+		TableName : "chats",
+		KeyConditionExpression: 'chatID = :chatid and sortkey = :sortkey',
+		ExpressionAttributeValues: {
+	  		':chatid' : {'S': chatid},
+			':sortkey' : {'S': 'member_'+user}
+		}
+  	};
+	
+	db.query(params, function(err, data) {
+		if(err) {
+			console.log(err);
+		}
+		callback(err, data);
+	});
+};
+
+var get_chat = function(chatid, callback) {
+	console.log("retreiving message from chat with id "+chatid);
+	params = {
+		TableName : "chats",
+		KeyConditionExpression: 'chatID = :chatid and begins_with(sortkey, :msg)',
+		ExpressionAttributeValues: {
+	  		':chatid' : {'S': chatid},
+			':msg' : {'S': 'message'}
+		}
+  	};
+
+	db.query(params, function(err, data) {
+		if(err) {
+			console.log(err);
+		}
+		console.log("no errors");
+		console.log(data);
+		callback(err, data);
+	})
+};
+
+/**
+Puts an item into the chats table corresponding to <message> being sent by <user> in chat <chatid>
+The sortkey for a message in the chats table is of the form message_<timestamp>_<messageid>.
+We will produce the timestamp using javascripts native methods, and produce a unique message id
+using nodes native crypto module. The message id doesnt have to be super long as itll only be needed
+in the rare case that two messages are sent by different users at the exact same time.
+ */
+var send_message = function(chatid, message, user, callback) {
+	console.log("adding new message to chat "+chatid);
+	//get the timestamp
+	var today = new Date();
+	var timestamp = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate()+'-'
+					+today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
+	var messageid = crypto.randomBytes(16).toString("hex").slice(24);
+	var params = {
+      Item: {
+        "chatID": {
+          S: chatid
+        },
+        "sortkey": { 
+          S: 'message_'+timestamp+'_'+messageid
+        },
+		"createdAt": {
+		  S: timestamp
+		},
+		"username": {
+		  S: user
+		},
+		"message": {
+		  S: message
+		}
+      },
+      TableName: "chats",
+      ReturnValues: 'NONE'
+  	};
+
+	//put the given item into the table
+	db.putItem(params, function(err, data){
+    	if (err) {
+      		callback(err);
+		} else {
+			callback(null, 'Success');
+		}
+  	});
+};
 
 var database = { 
   login_check: myDB_login_check,
@@ -406,6 +499,9 @@ var database = {
   get_posts_hp: myDB_get_posts_homepage,
   new_post: myDB_post,
   get_users_chats: get_users_chats,
+  in_chat: in_chat,
+  get_chat: get_chat,
+  send_message: send_message,
 };
 
 module.exports = database;
