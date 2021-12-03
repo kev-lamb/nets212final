@@ -11,7 +11,7 @@ function loadAll() {
         if (parsed.Item) {
             let arr = parsed.Item.results.L;
             for (result of arr) {
-                content += `<a href="/search" style="display: block">${result.S}</a>`;
+                content += `<a href="/user/${result.S}" style="display: block">${result.S}</a>`;
             }
         } else {
             content += '<p>None</p>';
@@ -36,7 +36,7 @@ function partialAutoCompelete() {
         if (parsed.Item) {
             let arr = parsed.Item.results.L;
             for (result of arr) {
-                content += `<a href="/search" style="display: block">${result.S}</a>`;
+                content += `<a href="/user/${result.S}" style="display: block">${result.S}</a>`;
             }
         } else {
             content += '<p>None</p>';

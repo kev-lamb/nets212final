@@ -10,7 +10,7 @@
             type="text/javascript"
             src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
         ></script>
-        <script src="home.js"></script>
+        <script src="friends.js"></script>
         <style>
             body {
                 padding-top: 40px;
@@ -23,15 +23,11 @@
             }
         </style>
     </head>
-    <body>
+    <body onload="initFriends()">
         <div class="main-box">
-            <a href="/account">My Profile</a>
-            <br />
-            <a href="/search">Search Users</a>
-            <br />
-            <a href="/friends">See Friends</a>
-            <br />
-            <a href="/signout">Sign Out</a>
+            <h1>Friends</h1>
+            <div id="friends-display"></div>
+            <a href="/">Back to Home</a>
         </div>
     </body>
 </html>

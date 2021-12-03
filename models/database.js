@@ -373,70 +373,73 @@ var myDB_post = function (title, content, poster, postee, callback) {
 };
 
 var get_users_chats = function (user, callback) {
-	console.log("looking for chats containing user");
-	console.log(user);
-	//get chats containing user
-  	params = {
-		TableName : "chats",
-		IndexName : "sortkey-chatID-index",
-		KeyConditionExpression: 'sortkey = :user',
-		ExpressionAttributeValues: {
-	  		':user' : {'S': 'member_' + user}
-		}
-  	}
+    console.log('looking for chats containing user');
+    console.log(user);
+    //get chats containing user
+    params = {
+        TableName: 'chats',
+        IndexName: 'sortkey-chatID-index',
+        KeyConditionExpression: 'sortkey = :user',
+        ExpressionAttributeValues: {
+            ':user': { S: 'member_' + user },
+        },
+    };
 
-	db.query(params, function(err, data) {
-		if (err) {
-			callback(err, null);
-		} else {
-			console.log("found chats");
-			console.log(data);
-			callback(err, data.Items);
-		}
-  	});	
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            console.log('found chats');
+            console.log(data);
+            callback(err, data.Items);
+        }
+    });
 };
 
 /**
 Searches the Chats table for specific chat and checks if the given user is in the chat.
 If the user is in the chat, data contains TRUE. Otherwise, data contains FALSE */
-var in_chat = function(user, chatid, callback) {
-	console.log("checking if user "+user+" has access to chat with id "+chatid);
-	params = {
-		TableName : "chats",
-		KeyConditionExpression: 'chatID = :chatid and sortkey = :sortkey',
-		ExpressionAttributeValues: {
-	  		':chatid' : {'S': chatid},
-			':sortkey' : {'S': 'member_'+user}
-		}
-  	};
-	
-	db.query(params, function(err, data) {
-		if(err) {
-			console.log(err);
-		}
-		callback(err, data);
-	});
+var in_chat = function (user, chatid, callback) {
+    console.log(
+        'checking if user ' + user + ' has access to chat with id ' + chatid
+    );
+    params = {
+        TableName: 'chats',
+        KeyConditionExpression: 'chatID = :chatid and sortkey = :sortkey',
+        ExpressionAttributeValues: {
+            ':chatid': { S: chatid },
+            ':sortkey': { S: 'member_' + user },
+        },
+    };
+
+    db.query(params, function (err, data) {
+        if (err) {
+            console.log(err);
+        }
+        callback(err, data);
+    });
 };
 
-var get_chat = function(chatid, callback) {
-	console.log("retreiving message from chat with id "+chatid);
-	params = {
-		TableName : "chats",
-		KeyConditionExpression: 'chatID = :chatid and begins_with(sortkey, :msg)',
-		ExpressionAttributeValues: {
-	  		':chatid' : {'S': chatid},
-			':msg' : {'S': 'message'}
-		}
-  	};
+var get_chat = function (chatid, callback) {
+    console.log('retreiving message from chat with id ' + chatid);
+    params = {
+        TableName: 'chats',
+        KeyConditionExpression:
+            'chatID = :chatid and begins_with(sortkey, :msg)',
+        ExpressionAttributeValues: {
+            ':chatid': { S: chatid },
+            ':msg': { S: 'message' },
+        },
+    };
 
-	db.query(params, function(err, data) {
-		if(err) {
-			console.log(err);
-		}
-		console.log("no errors");
-		console.log(data);
-		callback(err, data);
-	})
+    db.query(params, function (err, data) {
+        if (err) {
+            console.log(err);
+        }
+        console.log('no errors');
+        console.log(data);
+        callback(err, data);
+    });
 };
 
 /**
@@ -446,43 +449,53 @@ We will produce the timestamp using javascripts native methods, and produce a un
 using nodes native crypto module. The message id doesnt have to be super long as itll only be needed
 in the rare case that two messages are sent by different users at the exact same time.
  */
-var send_message = function(chatid, message, user, callback) {
-	console.log("adding new message to chat "+chatid);
-	//get the timestamp
-	var today = new Date();
-	var timestamp = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate()+'-'
-					+today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
-	var messageid = crypto.randomBytes(16).toString("hex").slice(24);
-	var params = {
-      Item: {
-        "chatID": {
-          S: chatid
+var send_message = function (chatid, message, user, callback) {
+    console.log('adding new message to chat ' + chatid);
+    //get the timestamp
+    var today = new Date();
+    var timestamp =
+        today.getFullYear() +
+        '-' +
+        (today.getMonth() + 1) +
+        '-' +
+        today.getDate() +
+        '-' +
+        today.getHours() +
+        ':' +
+        today.getMinutes() +
+        ':' +
+        today.getSeconds();
+    var messageid = crypto.randomBytes(16).toString('hex').slice(24);
+    var params = {
+        Item: {
+            chatID: {
+                S: chatid,
+            },
+            sortkey: {
+                S: 'message_' + timestamp + '_' + messageid,
+            },
+            createdAt: {
+                S: timestamp,
+            },
+            username: {
+                S: user,
+            },
+            message: {
+                S: message,
+            },
         },
-        "sortkey": { 
-          S: 'message_'+timestamp+'_'+messageid
-        },
-		"createdAt": {
-		  S: timestamp
-		},
-		"username": {
-		  S: user
-		},
-		"message": {
-		  S: message
-		}
-      },
-      TableName: "chats",
-      ReturnValues: 'NONE'
-  	};
+        TableName: 'chats',
+        ReturnValues: 'NONE',
+    };
 
-	//put the given item into the table
-	db.putItem(params, function(err, data){
-    	if (err) {
-      		callback(err);
-		} else {
-			callback(null, 'Success');
-		}
-  	});
+    //put the given item into the table
+    db.putItem(params, function (err, data) {
+        if (err) {
+            callback(err);
+        } else {
+            callback(null, 'Success');
+        }
+    });
 };
 
 var myDB_search_partial_update = function (
@@ -504,7 +517,6 @@ var myDB_search_partial_update = function (
         } else {
             if (data.Item) {
                 let results = data.Item.results.L;
-                console.log(results);
                 results.push({ S: username });
                 results.sort((a, b) => a.S.localeCompare(b.S));
                 if (results.length > 10) results.pop();
@@ -539,7 +551,6 @@ var myDB_search_partial_update = function (
                         },
                     },
                 };
-                console.log(params);
                 db.putItem(params, function (err, data) {
                     if (err) {
                         console.log(err);
@@ -560,6 +571,112 @@ var myDB_search_partial = function (searchTerm, callback) {
         },
     };
     db.getItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var myDB_get_friends = function (username, callback) {
+    let params = {
+        TableName: 'friends',
+        KeyConditionExpression: '#user = :username',
+        ExpressionAttributeNames: {
+            '#user': 'user',
+        },
+        ExpressionAttributeValues: {
+            ':username': { S: username },
+        },
+    };
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var myDB_add_friend = function (username, friend, callback) {
+    console.log('Adding friend between: ' + username + ' and ' + friend);
+    let params = {
+        TableName: 'friends',
+        Item: {
+            user: { S: username },
+            friend: { S: friend },
+        },
+    };
+    db.putItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+
+    params = {
+        TableName: 'friends',
+        Item: {
+            user: { S: friend },
+            friend: { S: username },
+        },
+    };
+    db.putItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var myDB_remove_friend = function (username, friend, callback) {
+    let params = {
+        TableName: 'friends',
+        Key: {
+            user: { S: username },
+            friend: { S: friend },
+        },
+    };
+    db.deleteItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+
+    params = {
+        TableName: 'friends',
+        Key: {
+            user: { S: friend },
+            friend: { S: username },
+        },
+    };
+    db.deleteItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var myDB_check_friend_status = function (username, otherperson, callback) {
+    let params = {
+        TableName: 'friends',
+        KeyConditionExpression: '#u = :username and friend = :friend',
+        ExpressionAttributeNames: {
+            '#u': 'user',
+        },
+        ExpressionAttributeValues: {
+            ':username': { S: username },
+            ':friend': { S: otherperson },
+        },
+    };
+    db.query(params, function (err, data) {
         if (err) {
             callback(err, null);
         } else {
@@ -595,9 +712,13 @@ var database = {
     get_users_chats: get_users_chats,
     get_partial_users: myDB_search_partial,
     post_partial_search: myDB_search_partial_update,
-	in_chat: in_chat,
-  	get_chat: get_chat,
-  	send_message: send_message,
+    in_chat: in_chat,
+    get_chat: get_chat,
+    send_message: send_message,
+    get_friends: myDB_get_friends,
+    add_friend: myDB_add_friend,
+    remove_friend: myDB_remove_friend,
+    check_friend_status: myDB_check_friend_status,
 };
 
 module.exports = database;

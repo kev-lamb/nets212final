@@ -130,6 +130,14 @@ var loadPartialUserList = function (req, res) {
     }
 };
 
+var getFriends = function (req, res) {
+    if (req.session.username) {
+        res.render('friends.ejs');
+    } else {
+        res.redirect('/login');
+    }
+};
+
 /*var loadAllUserList = function (req, res) {
     console.log('Fetching all users');
     console.log(req.body);
@@ -168,58 +176,106 @@ var signout = function (req, res) {
 };
 
 var testChats = function (req, res) {
-	res.render('chats.ejs');
-}
+    res.render('chats.ejs');
+};
 
 var openChat = function (req, res) {
-	if(!req.session.username) {
-		//users need to be logged in to access chats
-		res.redirect('/login?error=0');
-	} else {
-		//if no chat id is specified in the query, redirect to the page of all users chats
-		if(!req.query.chatid) {
-			res.redirect('/testchat');
-		} else {
-			//check if the user is in the chat
-			db.in_chat(req.session.username, req.query.chatid, function(err, data) {
-				if(data) {
-					//user is in the group, fetch the messages from this group and display them
-					db.get_chat(req.query.chatid, function(err, data) {
-						res.render('chat.ejs', {messages: data, chatid: req.query.chatid});
-					});
-					
-				} else {
-					//user is not in the group/doesnt have permission, so redirect to the list of their chats
-					res.redirect('/testchat');
-				}
-			})
-		}
-	}
+    if (!req.session.username) {
+        //users need to be logged in to access chats
+        res.redirect('/login?error=0');
+    } else {
+        //if no chat id is specified in the query, redirect to the page of all users chats
+        if (!req.query.chatid) {
+            res.redirect('/testchat');
+        } else {
+            //check if the user is in the chat
+            db.in_chat(
+                req.session.username,
+                req.query.chatid,
+                function (err, data) {
+                    if (data) {
+                        //user is in the group, fetch the messages from this group and display them
+                        db.get_chat(req.query.chatid, function (err, data) {
+                            res.render('chat.ejs', {
+                                messages: data,
+                                chatid: req.query.chatid,
+                            });
+                        });
+                    } else {
+                        //user is not in the group/doesnt have permission, so redirect to the list of their chats
+                        res.redirect('/testchat');
+                    }
+                }
+            );
+        }
+    }
 };
 
-var getMessages = function(req, res) {
-	if(!req.query.chatid) {
-		res.send(null);
-	} else {
-		db.get_chat(req.query.chatid, function(err, data) {
-			res.send(data);
-		});
-	}
+var getMessages = function (req, res) {
+    if (!req.query.chatid) {
+        res.send(null);
+    } else {
+        db.get_chat(req.query.chatid, function (err, data) {
+            res.send(data);
+        });
+    }
 };
 
-var sendMessage = function(req, res) {
-	console.log("we are in the post function");
-	if(!req.session.username) {
-		res.redirect('/login?error=0');
-	} else {
-		db.send_message(req.body.chatid, req.body.message, req.session.username, function(err, data) {
-			if(err) {
-				res.send(null);
-			} else {
-				res.send('success');
-			}
-		});
-	}
+var getUserPage = function (req, res) {
+    if (!req.session.username) {
+        //not logged in, redirect to login page
+        res.redirect('/login?error=0');
+    } else {
+        res.render('userpage.ejs', { person: req.params.username });
+    }
+};
+
+var checkFriendStatus = function (req, res) {
+    db.check_friend_status(
+        req.session.username,
+        req.body.user,
+        function (err, data) {
+            res.send(data);
+        }
+    );
+};
+
+var add_friend = function (req, res) {
+    db.add_friend(req.session.username, req.body.user, function (err, data) {
+        res.send();
+    });
+};
+
+var remove_friend = function (req, res) {
+    db.remove_friend(req.session.username, req.body.user, function (err, data) {
+        res.send();
+    });
+};
+
+var get_friends = function (req, res) {
+    db.get_friends(req.session.username, function (err, data) {
+        res.send(data);
+    });
+};
+
+var sendMessage = function (req, res) {
+    console.log('we are in the post function');
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        db.send_message(
+            req.body.chatid,
+            req.body.message,
+            req.session.username,
+            function (err, data) {
+                if (err) {
+                    res.send(null);
+                } else {
+                    res.send('success');
+                }
+            }
+        );
+    }
 };
 
 var routes = {
@@ -232,14 +288,20 @@ var routes = {
     edit_user_account: editAccount,
     update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
-	get_chats: getChats,
-	test_chats: testChats,
-	get_chat: openChat,
-	get_messages: getMessages,
-	send_message: sendMessage,
+    get_chats: getChats,
+    test_chats: testChats,
+    get_chat: openChat,
+    get_messages: getMessages,
+    send_message: sendMessage,
     get_search_users: searchForUsers,
     get_partial_search_users: loadPartialUserList,
     get_chats: getChats,
+    friends_page: getFriends,
+    user_page: getUserPage,
+    checkfriendstatus: checkFriendStatus,
+    add_friend: add_friend,
+    remove_friend: remove_friend,
+    get_friends: get_friends,
     signout: signout,
 };
 
