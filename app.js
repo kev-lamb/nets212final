@@ -41,8 +41,50 @@ app.post('/updateaccount', routes.update_account_check);
 // get user profile
 app.get('/data/userprofile', routes.get_user_profile);
 
+//get messages from a chat
+app.get('/data/chat', routes.get_messages);
+
+//post a message to the database
+app.post('/sendmessage', routes.send_message);
+
 // get a specific subset of chats
 app.get('/chats', routes.get_chats);
+
+//go to the page of a specific chat
+app.get('/chat', routes.get_chat);
+
+//dummy route to test chat functionality
+app.get('/testchat', routes.test_chats);
+
+// get search page
+app.get('/search', routes.get_search_users);
+
+// post partial search results
+app.post('/partialsearch', routes.get_partial_search_users);
+
+// post all search results
+//app.post('/allsearch', routes.get_all_search_users);
+
+// get friends
+app.get('/friends', routes.friends_page);
+
+// get user profile
+app.get('/user/:username', routes.user_page);
+
+// get signout
+app.get('/signout', routes.signout);
+
+//post friend status
+app.post('/checkfriendstatus', routes.checkfriendstatus);
+
+//post add friend
+app.post('/addfriend', routes.add_friend);
+
+//post remove friend
+app.post('/removefriend', routes.remove_friend);
+
+//post get all friends
+app.post('/getfriends', routes.get_friends);
 
 console.log('Author: G31');
 app.listen(8080);
