@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.apache.commons.math3.distribution.EnumeratedDistribution;
+import org.apache.commons.math3.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.spark.api.java.function.Function2;
@@ -224,7 +226,7 @@ public class ArticleAdsorption {
 	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
 	 */
 	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String filePath, String date) {
-		// TODO: Complete this method.
+		// TODO: Complete this method. (Query the News Table.)
 		
 		/*
 		JavaRDD<String[]> file = context.textFile(filePath, Config.PARTITIONS)
@@ -260,7 +262,7 @@ public class ArticleAdsorption {
 	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
 	 */
 	JavaPairRDD<Tuple2<Node, Node>, Double> getUserNetwork() {
-		// TODO: Complete this method.
+		// TODO: Complete this method. (Query the Users Table, Likes Table.)
 		
 		/*
 		JavaRDD<String[]> file = context.textFile(filePath, Config.PARTITIONS)
@@ -295,10 +297,11 @@ public class ArticleAdsorption {
 	 *             whose news feed will be updated through the use of this algorithm). 
 	 * @param date The date of the articles that will be considered when creating the
 	 *             user's updated news feed, provided in "YYYY-MM-DD" format.
+	 * @return The recommended article Node for the <inputUser>.
 	 * @throws IOException File read, network, and other errors
 	 * @throws InterruptedException User presses Ctrl-C
 	 */
-	public void run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
+	public Node run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
 		logger.info("Running");
 
         // Load the news feed network (no user data).
@@ -330,6 +333,10 @@ public class ArticleAdsorption {
 		// postIterLabelMaps for each of its nodes. 
 		JavaRDD<Node> nonSourceNodes = nodes.subtract(sourceNodes);
 		
+		// (Defined outside the scope of the upcoming while loop merely so it may be invoked
+		// after the while loop. Irrelevant value at the moment.)
+		JavaRDD<Node> updatedNonSourceNodes = nonSourceNodes;
+		
 		/*
 		 * Iteratively update the user scores
 		 */
@@ -350,7 +357,7 @@ public class ArticleAdsorption {
 			// Among the non-source nodes, coalesce each Node representing the same vertex,
 			// accumulating their midIterLabelMaps. 
 			
-			JavaRDD<Node> updatedNonSourceNodes = network.map(entry -> entry._1()._2());
+			updatedNonSourceNodes = network.map(entry -> entry._1()._2());
 				// Includes duplicates that we must coalesce.
 			
 			
@@ -382,7 +389,7 @@ public class ArticleAdsorption {
 				node.finalizeLabelMap();
 			});
 			
-			// TODO: Have a debug mode with printed information every iteration?
+			// TODO: Have a debug mode with printed information every iteration? (Optional)
 			/*
 			if (debug) {
 			
@@ -471,13 +478,47 @@ public class ArticleAdsorption {
 		}
 		
 		/*
-		 * TODO: Take the resulting Nodes and their corresponding user scores, and compile 
-		 * the nodes that are type = "article" with publishDate = <date>. Among them, randomly
-		 * select an article, using probabilities equal to the <inputUser> score 
-		 * from each node's postIterLabelMap.
+		 * TODO: Take the resulting updatedNonSourceNodes and compile the nodes that are type = "article" 
+		 * with publishDate = <date>, disregarding the articles that were already recommended to the 
+		 * <inputUser>. Among the remaining articles, randomly select one, using probabilities equal 
+		 * to their scaled <inputUser> scores from each node's postIterLabelMap.
 		 */
 
+		JavaRDD<Node> todaysArticles = updatedNonSourceNodes
+				.filter(node -> node.type.equals("article") && node.publishDate.equals(date));
+		
+		// TODO: Filter out the articles that were already recommended to the <inputUser>.
+		// (Query the Likes table.)
+		JavaRDD<Node> validArticles = todaysArticles;
+		
+		// Extract the <inputUser> score from each article's postIterLabelMap.
+		JavaPairRDD<Node, Double> articleAndUserScore = validArticles
+				.mapToPair(node -> new Tuple2<Node, Double>(node, node.postIterLabelMap.get(inputUser)));
+		
+		// Scale the <inputUser> scores such that they sum to 1.
+		// 1) First obtain the sum of all <inputUser> scores across the nodes.
+		JavaRDD<Double> userScores = articleAndUserScore.map(pair -> pair._2);
+		
+		Double scoreSum = userScores.aggregate(0.0, (val, row) -> val + row, (val1, val2) -> val1 + val2);
+		
+		// 2) Next scale each <inputUser> score by (1 / scoreSum).
+		JavaPairRDD<Node, Double> articleAndScaledScore = articleAndUserScore
+				.mapToPair(entry -> new Tuple2<Node, Double>(entry._1, entry._2 / scoreSum));
+		
+		// Randomly select and output an article using the scaled <inputUser> scores as weights.
+		// 1) Represent the PairRDD<Node, Double> as a list of Pair<Node, Double> objects.
+		// (Required by the eventually-invoked EnumeratedDistribution object.)
+		JavaRDD<Pair<Node, Double>> asPairs = articleAndScaledScore
+				.map(entry -> new Pair<>(entry._1, entry._2));
+		
+		List<Pair<Node, Double>> asPairList = asPairs.collect();
+		
+		// 2) Complete the weighted selection using an EnumeratedDistribution object.
+		Node selectedNode = new EnumeratedDistribution<Node>(asPairList).sample();
+			
 		logger.info("*** Finished absorption algorithm! ***");
+		
+		return selectedNode;
 	}
 
 
@@ -493,6 +534,7 @@ public class ArticleAdsorption {
 	
 	// Private class whose call() method is invoked in the aggregateByKey() method 
 	// that coalesces the nodes in updatedNonSourceNodes. Serves as the seq or comb function.
+	// (See JavaDocs for clarification.)
 	private class coalesceSeqOrCombFunc implements Function2<Map<String, Double>, Map<String, Double>, Map<String, Double>> {
 		
 		// Sum the two maps, value-by-value, into a new map.
