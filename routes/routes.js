@@ -14,7 +14,13 @@ var getHome = function (req, res) {
     if (req.session.username) {
         //user is logged in, should be sent to the homepage
         //sending with username so homepage can be personalized to the logged in user
-        res.render('home.ejs', { username: req.session.username });
+        db.get_posts_hp(req.session.username, function(err, data) {
+	 		if (err) {
+				console.log(err);
+			} else {
+				res.render('home.ejs', {username: req.session.username, posts: data});
+			}
+		});
     } else {
         //no user is logged in, should be sent to the login page
         res.redirect('/login');
