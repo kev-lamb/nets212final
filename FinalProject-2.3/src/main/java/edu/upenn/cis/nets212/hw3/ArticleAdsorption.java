@@ -9,8 +9,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.apache.commons.math3.distribution.EnumeratedDistribution;
+import org.apache.commons.math3.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -20,11 +23,11 @@ import edu.upenn.cis.nets212.config.Config;
 import edu.upenn.cis.nets212.storage.SparkConnector;
 import scala.Tuple2;
 
-public class ComputeRanks {
+public class ArticleAdsorption {
 	/**
 	 * The basic logger
 	 */
-	static Logger logger = LogManager.getLogger(ComputeRanks.class);
+	static Logger logger = LogManager.getLogger(ArticleAdsorption.class);
 
 	/**
 	 * Connection to Apache Spark
@@ -33,7 +36,7 @@ public class ComputeRanks {
 	
 	JavaSparkContext context;
 	
-	public ComputeRanks() {
+	public ArticleAdsorption() {
 		System.setProperty("file.encoding", "UTF-8");
 	}
 
@@ -223,7 +226,7 @@ public class ComputeRanks {
 	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
 	 */
 	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String filePath, String date) {
-		// TODO: Complete this method.
+		// TODO: Complete this method. (Query the News Table.)
 		
 		/*
 		JavaRDD<String[]> file = context.textFile(filePath, Config.PARTITIONS)
@@ -259,7 +262,7 @@ public class ComputeRanks {
 	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
 	 */
 	JavaPairRDD<Tuple2<Node, Node>, Double> getUserNetwork() {
-		// TODO: Complete this method.
+		// TODO: Complete this method. (Query the Users Table, Likes Table.)
 		
 		/*
 		JavaRDD<String[]> file = context.textFile(filePath, Config.PARTITIONS)
@@ -285,8 +288,8 @@ public class ComputeRanks {
 	/**
 	 * Main functionality in the program: read and process the network
 	 * 
-	 * @param dMax If the maximum change in the user score considering any 
-	 *             particular node falls at or below this value, the algorithm will terminate. 
+	 * @param dMax If the maximum change in the user score, considering any 
+	 *             LabelMap, falls at or below this value, the algorithm will terminate. 
 	 * @param iMax The maximum number of absorption iterations allowed to run before
 	 *             the algorithm terminates. 
 	 * @param debug If true, outputs the user score of each node after each iteration. 
@@ -294,10 +297,11 @@ public class ComputeRanks {
 	 *             whose news feed will be updated through the use of this algorithm). 
 	 * @param date The date of the articles that will be considered when creating the
 	 *             user's updated news feed, provided in "YYYY-MM-DD" format.
+	 * @return The recommended article Node for the <inputUser>.
 	 * @throws IOException File read, network, and other errors
 	 * @throws InterruptedException User presses Ctrl-C
 	 */
-	public void run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
+	public Node run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
 		logger.info("Running");
 
         // Load the news feed network (no user data).
@@ -320,14 +324,18 @@ public class ComputeRanks {
 		JavaRDD<Node> nodes = fromNodes.union(toNodes).distinct();
 		
         // Determine the source nodes. Note that their user scores will stay constant 
-		// throughout the algorithm (and in the case of a non-user node, 0.0 for each 
-		// user score), thus their user scores may be freely ignored. 
+		// throughout the algorithm (in the case of a non-user node, 0.0 for all 
+		// user scores), thus their user scores may be freely ignored. 
 		JavaRDD<Node> sourceNodes = nodes.subtract(toNodes);
 		
 		// The non-source nodes will be the ones with user scores we care about.
 		// This is the variable we will continue to update with the most current
 		// postIterLabelMaps for each of its nodes. 
 		JavaRDD<Node> nonSourceNodes = nodes.subtract(sourceNodes);
+		
+		// (Defined outside the scope of the upcoming while loop merely so it may be invoked
+		// after the while loop. Irrelevant value at the moment.)
+		JavaRDD<Node> updatedNonSourceNodes = nonSourceNodes;
 		
 		/*
 		 * Iteratively update the user scores
@@ -347,30 +355,84 @@ public class ComputeRanks {
 			});
 			
 			// Among the non-source nodes, coalesce each Node representing the same vertex,
-			// calling addLabelMap() to accumulate the midIterLabelMaps. 
+			// accumulating their midIterLabelMaps. 
 			
-			JavaRDD<Node> updatedNonSourceNodes = network.map(entry -> entry._1()._2());
-				// Includes duplicates that we will coalesce.
+			updatedNonSourceNodes = network.map(entry -> entry._1()._2());
+				// Includes duplicates that we must coalesce.
 			
-			/*
-			 * TODO: Coalesce the similar nodes in updatedNonSourceNodes. Perhaps mapToPair 
-			 * to a PairRDD<Node, midIterLabelMap> and then aggregateByKey?
-			 */
+			
+			// We will coalesce through a call to aggregateByKey(), where the value we aggregate
+			// are the midIterLabelMaps of each non-source node. We first make these midIterLabelMaps
+			// the value of a PairRDD<Node, Map>.
+			JavaPairRDD<Node, Map<String, Double>> nonsourceNodeAndLabelMap = updatedNonSourceNodes
+					.mapToPair(node -> new Tuple2<Node, Map<String, Double>>(node, node.midIterLabelMap));
+			
+			JavaPairRDD<Node, Map<String, Double>> coalesced = nonsourceNodeAndLabelMap
+					.aggregateByKey(new HashMap<String, Double>(), 
+							(val, row) -> (new coalesceSeqOrCombFunc()).call(val, row),      // Seq
+							(val1, val2) -> (new coalesceSeqOrCombFunc()).call(val1, val2)); // Comb
+			
+			// (At this point, no more duplicate nodes are present.)
+			
+			// We now pass the accumulated midIterLabelMaps to their corresponding non-source node.
+			// (I.e., updating the internal fields of each node.)
+			coalesced.foreach(pair -> {
+				Node node = pair._1;
+				node.midIterLabelMap = pair._2;
+			});
+			
+			// We now extract the Node key of the coalesced PairRDD<Node, Map>.
+			updatedNonSourceNodes = coalesced.map(pair -> pair._1);
 			
 			// Now finalize the postIterLabelMaps for each node in updatedNonSourceNodes.
-			// (No more duplicate nodes are present.)
 			updatedNonSourceNodes.foreach(node -> {
 				node.finalizeLabelMap();
 			});
 			
+			// TODO: Have a debug mode with printed information every iteration? (Optional)
 			/*
-			 * TODO: Calculate the change in user score among each node's LabelMap, for the <inputUser>.
-			 * This will be useful for measuring convergence, and possibly terminating the algorithm early.
-			 * 
-			 * Compare and contrast the variables nonSourceNodes and updatedNonSourceNodes. 
-			 * If determined that convergence has been reached, break out of the while loop.
+			if (debug) {
+			
+			}
+			*/
+			
+			/*
+			 * Test for convergence by comparing nonSourceNodes and updatedNonSourceNodes.
 			 */
 			
+			// A PairRDD created to facilitate an upcoming join().
+			JavaPairRDD<Node, Node> convenientPairOne = updatedNonSourceNodes
+					.mapToPair(node -> new Tuple2<Node, Node>(node, node));
+			
+			// A PairRDD created to facilitate an upcoming join().
+			JavaPairRDD<Node, Node> convenientPairTwo = nonSourceNodes
+					.mapToPair(node -> new Tuple2<Node, Node>(node, node));
+			
+			JavaPairRDD<Node, Tuple2<Node, Node>> joinRDD = convenientPairOne.join(convenientPairTwo);
+			
+			JavaPairRDD<Node, Node> newNodeAndOldNode = joinRDD
+					.mapToPair(entry -> new Tuple2<Node, Node>(entry._2._1, entry._2._2));
+			
+			JavaPairRDD<Node, Double> nodeAndScoreDiff = newNodeAndOldNode
+					.mapToPair(pair -> new Tuple2<Node, Double>(pair._1,
+							pair._1.postIterLabelMap.get(inputUser)
+							- pair._2.postIterLabelMap.get(inputUser)));
+
+			List<Tuple2<Double, Node>> maxScoreDiffList = nodeAndScoreDiff
+					.mapToPair(pair -> new Tuple2<Double, Node>(pair._2, pair._1))
+					.sortByKey(false)
+					.take(1);
+			
+			double maxScoreDiff = maxScoreDiffList.get(0)._1();
+			
+			if (maxScoreDiff <= dMax) {
+				break;
+			}	
+			
+			/*
+			 * Prepare for the upcoming iteration.
+			 */
+			 			
 			// If a from_node in the network is also a non-source node, it should be updated 
 			// to how it appears in updatedNonSourceNodes (to have an up-to-date postIterLabelMap
 			// for propagating in the upcoming iteration).
@@ -402,23 +464,6 @@ public class ComputeRanks {
 				Node toNode = entry._1()._2();
 				toNode.zeroLabelMap();	
 			});
-									
-			// TODO: Have a debug mode with printed information every iteration?
-			/*
-			if (debug) {
-				System.out.println("Iteration " + String.valueOf(iterationCount) + " is complete.");
-				
-				List<Tuple2<Integer, Double>> sRankList = newSocialRank.collect();
-				for (Tuple2<Integer, Double> tuple : sRankList) {
-					int nodeID = tuple._1();
-					double sRank = tuple._2();
-					
-					System.out.println(String.valueOf(nodeID) + " | " + String.valueOf(sRank));
-				}
-				
-				System.out.println("----------");
-			}
-			*/
 				
 			// We can now pass nonSourceNodes to its updated value. 
 			// (To refer back to it in the upcoming iteration, when testing for convergence.)
@@ -433,13 +478,47 @@ public class ComputeRanks {
 		}
 		
 		/*
-		 * TODO: Take the resulting Nodes and their corresponding user scores, and compile 
-		 * the nodes that are type = "article" with publishDate = <date>. Among them, randomly
-		 * select an article, using probabilities equal to the <inputUser> score 
-		 * from each node's postIterLabelMap.
+		 * TODO: Take the resulting updatedNonSourceNodes and compile the nodes that are type = "article" 
+		 * with publishDate = <date>, disregarding the articles that were already recommended to the 
+		 * <inputUser>. Among the remaining articles, randomly select one, using probabilities equal 
+		 * to their scaled <inputUser> scores from each node's postIterLabelMap.
 		 */
 
+		JavaRDD<Node> todaysArticles = updatedNonSourceNodes
+				.filter(node -> node.type.equals("article") && node.publishDate.equals(date));
+		
+		// TODO: Filter out the articles that were already recommended to the <inputUser>.
+		// (Query the Likes table.)
+		JavaRDD<Node> validArticles = todaysArticles;
+		
+		// Extract the <inputUser> score from each article's postIterLabelMap.
+		JavaPairRDD<Node, Double> articleAndUserScore = validArticles
+				.mapToPair(node -> new Tuple2<Node, Double>(node, node.postIterLabelMap.get(inputUser)));
+		
+		// Scale the <inputUser> scores such that they sum to 1.
+		// 1) First obtain the sum of all <inputUser> scores across the nodes.
+		JavaRDD<Double> userScores = articleAndUserScore.map(pair -> pair._2);
+		
+		Double scoreSum = userScores.aggregate(0.0, (val, row) -> val + row, (val1, val2) -> val1 + val2);
+		
+		// 2) Next scale each <inputUser> score by (1 / scoreSum).
+		JavaPairRDD<Node, Double> articleAndScaledScore = articleAndUserScore
+				.mapToPair(entry -> new Tuple2<Node, Double>(entry._1, entry._2 / scoreSum));
+		
+		// Randomly select and output an article using the scaled <inputUser> scores as weights.
+		// 1) Represent the PairRDD<Node, Double> as a list of Pair<Node, Double> objects.
+		// (Required by the eventually-invoked EnumeratedDistribution object.)
+		JavaRDD<Pair<Node, Double>> asPairs = articleAndScaledScore
+				.map(entry -> new Pair<>(entry._1, entry._2));
+		
+		List<Pair<Node, Double>> asPairList = asPairs.collect();
+		
+		// 2) Complete the weighted selection using an EnumeratedDistribution object.
+		Node selectedNode = new EnumeratedDistribution<Node>(asPairList).sample();
+			
 		logger.info("*** Finished absorption algorithm! ***");
+		
+		return selectedNode;
 	}
 
 
@@ -453,30 +532,35 @@ public class ComputeRanks {
 			spark.close();
 	}
 	
-	
-    // TODO: Update main method.
-	public static void main(String[] args) {
-		final ComputeRanks cr = new ComputeRanks();
-
-		try {
-			cr.initialize();
-			if (args.length == 0) {
-				cr.run(30.0, 15, false, "testUser", "2021-11-27");
-			} else if (args.length == 1) {
-				cr.run(Double.valueOf(args[0]), 15, false, "testUser", "2021-11-27");
-			} else if (args.length == 2) {
-				cr.run(Double.valueOf(args[0]), Integer.valueOf(args[1]), false, "testUser", "2021-11-27");
+	// Private class whose call() method is invoked in the aggregateByKey() method 
+	// that coalesces the nodes in updatedNonSourceNodes. Serves as the seq or comb function.
+	// (See JavaDocs for clarification.)
+	private class coalesceSeqOrCombFunc implements Function2<Map<String, Double>, Map<String, Double>, Map<String, Double>> {
+		
+		// Sum the two maps, value-by-value, into a new map.
+		public Map<String, Double> call(Map<String, Double> val, Map<String, Double> row) {
+			if (val.isEmpty()) {
+				// The empty map serves as our zeroValue in the aggregateByKey() call.
+				// It is to be interpreted as a map from each user to the double 0.0.
+				return row;
 			} else {
-				cr.run(Double.valueOf(args[0]), Integer.valueOf(args[1]), true, "testUser", "2021-11-27");
+				// A non-trivial sumMap:
+				HashMap<String, Double> sumMap = new HashMap<>();
+				
+				Iterator<Entry<String, Double>> iter = row.entrySet().iterator();
+				while (iter.hasNext()) {
+					Entry<String, Double> entry = iter.next();
+					String user = entry.getKey();
+					Double score = entry.getValue();
+					Double otherMapScore = val.get(user);
+					
+					sumMap.put(user, score + otherMapScore);
+				}
+				
+				return sumMap;				
 			}
-		} catch (final IOException ie) {
-			logger.error("I/O error: ");
-			ie.printStackTrace();
-		} catch (final InterruptedException e) {
-			e.printStackTrace();
-		} finally {
-			cr.shutdown();
 		}
+		
 	}
-
+	
 }

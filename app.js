@@ -65,8 +65,29 @@ app.post('/partialsearch', routes.get_partial_search_users);
 // post all search results
 //app.post('/allsearch', routes.get_all_search_users);
 
-// post signout
+// get friends
+app.get('/friends', routes.friends_page);
+
+// get user profile
+app.get('/user/:user', routes.user_page);
+
+// get signout
 app.get('/signout', routes.signout);
+
+//post friend status
+app.post('/checkfriendstatus', routes.checkfriendstatus);
+
+//post add friend
+app.post('/addfriend', routes.add_friend);
+
+//post remove friend
+app.post('/removefriend', routes.remove_friend);
+
+//post get all friends
+app.post('/getfriends', routes.get_friends);
+
+//post get last online status
+app.post('/lastonline/:user', routes.last_online_user);
 
 console.log('Author: G31');
 app.listen(8080);
