@@ -25,7 +25,6 @@ var myDB_login_check = function (inputUname, inputPword, callback) {
             },
         },
     };
-
     db.query(params, function (err, data) {
         if (inputUname.length == 0 || inputPword.length == 0) {
             callback('Complete all inputs!', null);
@@ -685,6 +684,43 @@ var myDB_check_friend_status = function (username, otherperson, callback) {
     });
 };
 
+var update_last_online = function (username) {
+    let d = new Date();
+    let params = {
+        TableName: 'users',
+        Key: {
+            username: {
+                S: username,
+            },
+        },
+        UpdateExpression: 'set last_online = :last_online',
+        ExpressionAttributeValues: {
+            ':last_online': { N: (d.getTime() / 1000).toString() },
+        },
+        ReturnValues: 'UPDATED_NEW',
+    };
+    db.updateItem(params, function (err, data) {});
+};
+
+var check_last_online = function (username, callback) {
+    let params = {
+        TableName: 'users',
+        Key: {
+            username: {
+                S: username,
+            },
+        },
+        AttributesToGet: ['last_online'],
+    };
+    db.getItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
 /*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
@@ -719,6 +755,8 @@ var database = {
     add_friend: myDB_add_friend,
     remove_friend: myDB_remove_friend,
     check_friend_status: myDB_check_friend_status,
+    update_last_online: update_last_online,
+    check_last_online: check_last_online,
 };
 
 module.exports = database;

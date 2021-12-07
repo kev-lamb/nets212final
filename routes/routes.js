@@ -11,15 +11,19 @@ If the user is not logged in, should send them to the login page
  */
 
 var getHome = function (req, res) {
-    if (req.session.username) {
+    loginProtectedRoute(req, res, () => {
+        res.render('home.ejs', { username: req.session.username });
+    });
+};
+/*if (req.session.username) {
+        db.update_last_online(req.session.username);
         //user is logged in, should be sent to the homepage
         //sending with username so homepage can be personalized to the logged in user
         res.render('home.ejs', { username: req.session.username });
     } else {
         //no user is logged in, should be sent to the login page
         res.redirect('/login');
-    }
-};
+    }*/
 
 // [login] index based url query custom error messages
 let loginError = ['Login Information Incorrect'];
@@ -34,7 +38,6 @@ var loginCheck = function (req, res) {
 
     db.login_check(username, password, function (err, data) {
         if (err) {
-            error = err;
             res.redirect('/login?error=0');
         } else {
             if (!req.session.username) {
@@ -74,81 +77,64 @@ var newAccCheck = function (req, res) {
 };
 
 var getAccount = function (req, res) {
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
+    loginProtectedRoute(req, res, () => {
         res.render('account.ejs');
-    }
+    });
 };
 
 var editAccount = function (req, res) {
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
+    loginProtectedRoute(req, res, () => {
         res.render('editaccount.ejs');
-    }
+    });
 };
 
 var updateAccount = function (req, res) {
-    db.update_user_profile(req.body, function (err, data) {
-        if (err) {
-            res.redirect('/editaccount?error=0');
-        } else {
-            res.redirect('/account');
-        }
+    loginProtectedRoute(req, res, () => {
+        db.update_user_profile(req.body, function (err, data) {
+            if (err) {
+                res.redirect('/editaccount?error=0');
+            } else {
+                res.redirect('/account');
+            }
+        });
     });
 };
 
 var loadUserProfile = function (req, res) {
-    console.log('Fetching User Profile Data');
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
+    loginProtectedRoute(req, res, () => {
         db.get_user_profile_data(req.session.username, function (err, data) {
             res.send(JSON.stringify(data));
         });
-    }
+    });
 };
 
 var searchForUsers = function (req, res) {
-    console.log('Searching for users');
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
+    loginProtectedRoute(req, res, () => {
         res.render('search.ejs');
-    }
+    });
 };
 
 var loadPartialUserList = function (req, res) {
-    console.log('Fetching partial users');
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
+    loginProtectedRoute(req, res, () => {
         db.get_partial_users(req.body.searchTerm, function (err, data) {
             res.send(JSON.stringify(data));
         });
-    }
+    });
 };
 
 var getFriends = function (req, res) {
-    if (req.session.username) {
+    loginProtectedRoute(req, res, () => {
         res.render('friends.ejs');
-    } else {
-        res.redirect('/login');
-    }
+    });
 };
 
-/*var loadAllUserList = function (req, res) {
-    console.log('Fetching all users');
-    console.log(req.body);
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
-        db.get_all_users(req.body.searchTerm, function (err, data) {
-            res.send(JSON.stringify(data));
+var last_online_user = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        db.check_last_online(req.params.user, (err, data) => {
+            res.send({ ...data, user: req.params.user });
         });
-    }
-};*/
+    });
+};
 
 /*
 Fetches a specific subset of chats
@@ -222,12 +208,9 @@ var getMessages = function (req, res) {
 };
 
 var getUserPage = function (req, res) {
-    if (!req.session.username) {
-        //not logged in, redirect to login page
-        res.redirect('/login?error=0');
-    } else {
-        res.render('userpage.ejs', { person: req.params.username });
-    }
+    loginProtectedRoute(req, res, () => {
+        res.render('userpage.ejs', { person: req.params.user });
+    });
 };
 
 var checkFriendStatus = function (req, res) {
@@ -277,6 +260,18 @@ var sendMessage = function (req, res) {
         );
     }
 };
+/*
+    Wraps all routes that require login so they always redirect to same place
+    Update last online time
+*/
+var loginProtectedRoute = function (req, res, callback) {
+    if (req.session.username) {
+        db.update_last_online(req.session.username);
+        callback();
+    } else {
+        res.redirect('/login?error=0');
+    }
+};
 
 var routes = {
     home_page: getHome,
@@ -302,6 +297,7 @@ var routes = {
     add_friend: add_friend,
     remove_friend: remove_friend,
     get_friends: get_friends,
+    last_online_user: last_online_user,
     signout: signout,
 };
 

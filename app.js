@@ -69,7 +69,7 @@ app.post('/partialsearch', routes.get_partial_search_users);
 app.get('/friends', routes.friends_page);
 
 // get user profile
-app.get('/user/:username', routes.user_page);
+app.get('/user/:user', routes.user_page);
 
 // get signout
 app.get('/signout', routes.signout);
@@ -85,6 +85,9 @@ app.post('/removefriend', routes.remove_friend);
 
 //post get all friends
 app.post('/getfriends', routes.get_friends);
+
+//post get last online status
+app.post('/lastonline/:user', routes.last_online_user);
 
 console.log('Author: G31');
 app.listen(8080);
