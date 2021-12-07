@@ -1,8 +1,8 @@
 async function loadData() {
-    return $.getJSON('/chats');
+    return $.getJSON('/posts');
 }
 
-async function fetchAllChats() {
+async function fetchAllPosts() {
 	console.log("Testing console printing");
     let data = await loadData();
 	let table = document.getElementById('test');
@@ -10,7 +10,7 @@ async function fetchAllChats() {
 		var row = table.insertRow(0);
 		var cell = row.insertCell(0);
 
-		cell.innerHTML = data[i]["chatID"].S;
+		cell.innerHTML = data[i]["postId"].S;
 		
 	}
 	//document.getElementById('test').innerText = data[0]["sortkey"].S;

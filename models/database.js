@@ -204,17 +204,17 @@ var update_user_profile = function (inputData, callback) {
     }
 };
 
-var myDB_get_posts_wall = function (user, callback) {
+var myDB_get_posts_wall = function (username, callback) {
     console.log('Beginning post table scan.');
 
     //get posts to user
     params = {
         TableName: 'posts',
-        KeyConditionExpression: 'postee = :user',
+        KeyConditionExpression: 'postee = :username',
         ExpressionAttributeValues: {
-            ':user': { S: user },
+            ':username': { S: username },
         },
-        FilterExpression: 'poster != :user',
+        FilterExpression: 'poster <> :username',
     };
 
     db.query(params, function (err, data) {
@@ -225,13 +225,13 @@ var myDB_get_posts_wall = function (user, callback) {
         }
     });
 
-    //get posts from user
+    //get posts from username
     params = {
         TableName: 'posts',
         IndexName: 'poster-postid-index',
-        KeyConditionExpression: 'poster = :user',
+        KeyConditionExpression: 'poster = :username',
         ExpressionAttributeValues: {
-            ':user': { S: user },
+            ':username': { S: username },
         },
     };
 
@@ -246,53 +246,58 @@ var myDB_get_posts_wall = function (user, callback) {
     callback(null, out);
 };
 
-var myDB_get_posts_homepage = function (user, callback) {
-    console.log('Beginning post table scan.');
+var myDB_get_posts_homepage = function (username, callback) {
+    console.log('Beginning post table query.');
 
     var out = [];
 
-    //get users friends
+    //get usernames friends
     let params = {
         TableName: 'friends',
-        KeyConditionExpression: 'user = :user',
+        KeyConditionExpression: '#user = :username',
+		ExpressionAttributeNames: {
+            '#user': 'user',
+        },
         ExpressionAttributeValues: {
-            ':user': { S: user },
+            ':username': { S: username },
         },
     };
-
+	console.log('Beginning friends search')
     db.query(params, function (err, data) {
         if (err) {
+			console.log('failed friends search')
             callback(err, null);
         } else {
             for (var i = 0; i < data.Items.length; i++) {
+				console.log(data.Items[i].friend.S)
                 params = {
                     TableName: 'posts',
                     IndexName: 'poster-postid-index',
                     KeyConditionExpression: 'poster = :friend',
-                    FilterExpression: 'postee != :user',
+                    FilterExpression: 'postee <> :username',
                     ExpressionAttributeValues: {
                         ':friend': { S: data.Items[i].friend.S },
-                        ':user': { S: user },
+                        ':username': { S: username },
                     },
                 };
                 db.query(params, function (err, data2) {
                     if (err) {
                         callback(err, null);
                     } else {
-                        out.concat(data2.Items);
+                        out = out.concat(data2.Items);
                     }
                 });
             }
         }
     });
 
-    //get posts to user
+    //get posts to username
     params = {
         TableName: 'posts',
-        KeyConditionExpression: 'postee = :user',
-        FilterExpression: 'poster != :user',
+        KeyConditionExpression: 'postee = :username',
+        FilterExpression: 'poster <> :username',
         ExpressionAttributeValues: {
-            ':user': { S: user },
+            ':username': { S: username },
         },
     };
 
@@ -300,17 +305,17 @@ var myDB_get_posts_homepage = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            out.concat(data.Items);
+            out = out.concat(data.Items);
         }
     });
 
-    //get posts from user
+    //get posts from username
     params = {
         TableName: 'posts',
         IndexName: 'poster-postid-index',
-        KeyConditionExpression: 'poster = :user',
+        KeyConditionExpression: 'poster = :username',
         ExpressionAttributeValues: {
-            ':user': { S: user },
+            ':username': { S: username },
         },
     };
 
@@ -318,11 +323,12 @@ var myDB_get_posts_homepage = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            out.concat(data.Items);
+			console.log(out);
+            out = out.concat(data.Items);
+			console.log(out);
+		    callback(null, out);
         }
     });
-
-    callback(null, out);
 };
 
 var myDB_post = function (title, content, poster, postee, callback) {
