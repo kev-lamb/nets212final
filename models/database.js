@@ -2,7 +2,6 @@ var AWS = require('aws-sdk');
 AWS.config.update({ region: 'us-east-1' });
 var db = new AWS.DynamoDB();
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 
 // Verify that the provided login information matches an item in the users table
 var myDB_login_check = function (inputUname, inputPword, callback) {
@@ -255,21 +254,21 @@ var myDB_get_posts_homepage = function (username, callback) {
     let params = {
         TableName: 'friends',
         KeyConditionExpression: '#user = :username',
-		ExpressionAttributeNames: {
+        ExpressionAttributeNames: {
             '#user': 'user',
         },
         ExpressionAttributeValues: {
             ':username': { S: username },
         },
     };
-	console.log('Beginning friends search')
+    console.log('Beginning friends search');
     db.query(params, function (err, data) {
         if (err) {
-			console.log('failed friends search')
+            console.log('failed friends search');
             callback(err, null);
         } else {
             for (var i = 0; i < data.Items.length; i++) {
-				console.log(data.Items[i].friend.S)
+                console.log(data.Items[i].friend.S);
                 params = {
                     TableName: 'posts',
                     IndexName: 'poster-postid-index',
@@ -323,10 +322,10 @@ var myDB_get_posts_homepage = function (username, callback) {
         if (err) {
             callback(err, null);
         } else {
-			console.log(out);
+            console.log(out);
             out = out.concat(data.Items);
-			console.log(out);
-		    callback(null, out);
+            console.log(out);
+            callback(null, out);
         }
     });
 };
@@ -727,6 +726,38 @@ var check_last_online = function (username, callback) {
     });
 };
 
+var get_friends_visualizer = function (username, nodeid, callback) {
+    myDB_data_user_profile(username, function (err, data) {
+        let userAffiliation = data.Item.affiliation.S;
+        myDB_get_friends(nodeid, function (err, data) {
+            let promises = [];
+            for (friend of data.Items) {
+                promises.push(
+                    new Promise((resolve, reject) => {
+                        myDB_data_user_profile(
+                            friend.friend.S,
+                            function (err, data) {
+                                if (err) reject(err);
+                                resolve(data.Item);
+                            }
+                        );
+                    })
+                );
+            }
+
+            Promise.all(promises).then((data) => {
+                let ret = [];
+                for (friend of data) {
+                    if (!friend.affiliation.S.localeCompare(userAffiliation)) {
+                        ret.push(friend);
+                    }
+                }
+                callback(err, ret);
+            });
+        });
+    });
+};
+
 /*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
@@ -763,6 +794,7 @@ var database = {
     check_friend_status: myDB_check_friend_status,
     update_last_online: update_last_online,
     check_last_online: check_last_online,
+    get_friends_visualizer: get_friends_visualizer,
 };
 
 module.exports = database;

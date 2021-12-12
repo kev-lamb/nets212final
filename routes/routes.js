@@ -13,20 +13,23 @@ If the user is not logged in, should send them to the login page
 var getHome = function (req, res) {
     loginProtectedRoute(req, res, () => {
         if (req.session.username) {
-        db.update_last_online(req.session.username);
-        //user is logged in, should be sent to the homepage
-        //sending with username so homepage can be personalized to the logged in user
-        db.get_posts_hp(req.session.username, function(err, data) {
-	 		if (err) {
-				console.log(err);
-			} else {
-				res.render('home.ejs', {username: req.session.username, posts: data});
-			}
-		});
-  	  } else {
-        //no user is logged in, should be sent to the login page
-        res.redirect('/login');
-    	}
+            db.update_last_online(req.session.username);
+            //user is logged in, should be sent to the homepage
+            //sending with username so homepage can be personalized to the logged in user
+            db.get_posts_hp(req.session.username, function (err, data) {
+                if (err) {
+                    console.log(err);
+                } else {
+                    res.render('home.ejs', {
+                        username: req.session.username,
+                        posts: data,
+                    });
+                }
+            });
+        } else {
+            //no user is logged in, should be sent to the login page
+            res.redirect('/login');
+        }
     });
 };
 /*if (req.session.username) {
@@ -261,6 +264,22 @@ var get_friends = function (req, res) {
     });
 };
 
+var get_visualizer_page = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        res.render('friendvisualizer.ejs');
+    });
+};
+
+var get_visualizer_data = function (req, res) {
+    db.get_friends_visualizer(
+        req.session.username,
+        req.params.nodeid,
+        function (err, data) {
+            res.send(data);
+        }
+    );
+};
+
 var sendMessage = function (req, res) {
     console.log('we are in the post function');
     if (!req.session.username) {
@@ -319,6 +338,8 @@ var routes = {
     get_friends: get_friends,
     last_online_user: last_online_user,
     signout: signout,
+    get_visualizer_page: get_visualizer_page,
+    get_visualizer_data: get_visualizer_data,
 };
 
 module.exports = routes;

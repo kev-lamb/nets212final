@@ -13,6 +13,7 @@ app.use(
     })
 );
 app.use(express.static('scripts'));
+app.use(express.static('css'));
 
 // home page is first page we see
 app.get('/', routes.home_page);
@@ -88,6 +89,12 @@ app.post('/getfriends', routes.get_friends);
 
 //post get last online status
 app.post('/lastonline/:user', routes.last_online_user);
+
+//get visualizer page
+app.get('/friendvisualizer', routes.get_visualizer_page);
+
+//get visualizer data
+app.get('/friendvisualizationdata/:nodeid', routes.get_visualizer_data);
 
 console.log('Author: G31');
 app.listen(8080);
