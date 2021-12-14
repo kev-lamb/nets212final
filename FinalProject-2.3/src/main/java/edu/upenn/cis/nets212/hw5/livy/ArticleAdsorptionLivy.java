@@ -1,4 +1,4 @@
-package edu.upenn.cis.nets212.hw3.livy;
+package edu.upenn.cis.nets212.hw5.livy;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,7 +14,7 @@ import org.apache.livy.LivyClientBuilder;
 
 import edu.upenn.cis.nets212.config.Config;
 
-public class ComputeRanksLivy {
+public class ArticleAdsorptionLivy {
 	public static void main(String[] args) throws IOException, URISyntaxException, InterruptedException, ExecutionException {
 		
 		LivyClient client = new LivyClientBuilder()
@@ -27,7 +27,8 @@ public class ComputeRanksLivy {
 		  System.out.printf("Uploading %s to the Spark context...\n", jar);
 		  client.uploadJar(new File(jar)).get();
 		  
-		  String sourceFile = Config.SOCIAL_NET_PATH;//.BIGGER_SOCIAL_NET_PATH;
+		  String sourceFile = Config.NEWS_FEED_PATH;
+		  //String sourceFile = Config.SOCIAL_NET_PATH;//.BIGGER_SOCIAL_NET_PATH;
 		  //String sourceFile = Config.BIGGER_SOCIAL_NET_PATH;
 
 		  System.out.printf("Running SocialRankJob with %s as its input...\n", sourceFile);
