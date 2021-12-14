@@ -1,15 +1,35 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Home</title>
-        <link
-            rel="stylesheet"
-            href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
-        />
+        <title>User Wall</title>
+        <script
+            src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous"
+        ></script>
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+            integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+            crossorigin="anonymous"
+        ></script>
         <script
             type="text/javascript"
             src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
         ></script>
+        <link
+            rel="stylesheet"
+            href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+            integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO"
+            crossorigin="anonymous"
+        />
+        <script
+            src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+            integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+            crossorigin="anonymous"
+        ></script>
+
+        <script src="/formvalidation.js"></script>
+        <script src="/createPost.js"></script>
         <style>
             body {
                 padding-top: 40px;
@@ -17,21 +37,119 @@
                 background-color: white;
             }
             .main-box {
-                width: 330px;
+                width: 600px;
                 margin: 0 auto;
             }
+            .incorrect {
+                border-color: red;
+            }
+            .card {
+                margin-bottom: 10px;
+            }
+            .card-text {
+                padding: 10px;
+            }
         </style>
+        <script>
+            var me = '<%=me%>';
+            var person = '<%=person%>';
+            var mypage = '<%=mywall%>' === 'true';
+        </script>
     </head>
 
-    <body onload="initButton()">
+    <body onload="loadPage()">
         <div class="main-box">
             <h1 id="otherperson"><%=person%></h1>
-            <button
-                id="friendbutton"
-                type="button"
-                class="btn"
-                onclick="changeFriendStatus()"
-            ></button>
+            <div id="friendButtonDiv">
+                <button
+                    id="friendbutton"
+                    type="button"
+                    class="btn"
+                    onclick="changeFriendStatus()"
+                ></button>
+            </div>
+            <br />
+            <div id="createPost">
+                <button
+                    role="button"
+                    data-toggle="collapse"
+                    href="#collapseForm"
+                    aria-expanded="false"
+                    aria-controls="collapseForm"
+                    class="btn btn-primary"
+                >
+                    Post to your wall
+                </button>
+                <br />
+                <div class="collapse" id="collapseForm">
+                    <br />
+                    <form id='createPost' onsubmit="return postNewPost('createPost');">
+                        <label for="title">Title</label>
+                        <input
+                            type="text"
+                            id="title"
+                            name="title"
+                            class="form-control"
+                        />
+                        <label for="content">Content</label>
+                        <textarea
+                            id="content"
+                            class="form-control"
+                            required
+                        ></textarea>
+
+                        <br />
+                        <input
+                            type="submit"
+                            value="Post"
+                            class="btn btn-xs btn-primary btn-block"
+                        />
+                    </form>
+                </div>
+            </div>
+            <div id='createPostElse'>
+                <div id="postOnSomeoneElsesWall">
+                    <button
+                        role="button"
+                        data-toggle="collapse"
+                        href="#collapseFormElse"
+                        aria-expanded="false"
+                        aria-controls="collapseFormElse"
+                        class="btn btn-primary"
+                    >
+                        Post to <%=person%>'s wall
+                    </button>
+                    <br />
+                    <div class="collapse" id="collapseFormElse">
+                        <br />
+                        <form  onsubmit="return postNewPost('createPostElse');">
+                            <label for="title">Title</label>
+                            <input
+                                type="text"
+                                id="titleElse"
+                                name="title"
+                                class="form-control"
+                            />
+                            <label for="content">Content</label>
+                            <textarea
+                                id="contentElse"
+                                class="form-control"
+                                required
+                            ></textarea>
+    
+                            <br />
+                            <input
+                                type="submit"
+                                value="Post"
+                                class="btn btn-xs btn-primary btn-block"
+                            />
+                        </form>
+                    </div>
+            </div>
+
+            <br />
+            <div id="posts"></div>
+            <br />
             <a href="/">Back to Home</a>
         </div>
         <script src="/userpage.js"></script>

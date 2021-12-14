@@ -17,15 +17,18 @@ app.use(express.static('css'));
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
-io.on('connection', socket => {
-	console.log("a user connected");
-	socket.on('send-chat-message', data => {
-		console.log("server received a message");
-		console.log(data.message);
-		socket.broadcast.emit('chat-message', {message: data.message, user: data.username, chatid: data.chatid});
-	});
+io.on('connection', (socket) => {
+    console.log('a user connected');
+    socket.on('send-chat-message', (data) => {
+        console.log('server received a message');
+        console.log(data.message);
+        socket.broadcast.emit('chat-message', {
+            message: data.message,
+            user: data.username,
+            chatid: data.chatid,
+        });
+    });
 });
-
 
 // home page is first page we see
 app.get('/', routes.home_page);
@@ -112,6 +115,18 @@ app.get('/friendvisualizer', routes.get_visualizer_page);
 
 //get visualizer data
 app.get('/friendvisualizationdata/:nodeid', routes.get_visualizer_data);
+
+//post a post!
+app.post('/makeapost', routes.post_a_post);
+
+//get user posts
+app.get('/getposts', routes.get_posts);
+
+//get posts to wall
+app.get('/getwallposts', routes.get_wall_posts);
+
+//get user posts
+app.post('/deletepost', routes.delete_post);
 
 console.log('Author: G31');
 http.listen(8080);

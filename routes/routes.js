@@ -11,35 +11,28 @@ If the user is not logged in, should send them to the login page
  */
 
 var getHome = function (req, res) {
-    loginProtectedRoute(req, res, () => {  
-        db.get_posts_hp(req.session.username, function (err, data) {
+    loginProtectedRoute(req, res, () => {
+        res.render('home.ejs', {
+            username: req.session.username,
+        });
+    });
+};
+
+var getWall = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        db.get_posts_w(req.params.user, function (err, data) {
             if (err) {
                 console.log(err);
             } else {
-                res.render('home.ejs', {
+                res.render('wall.ejs', {
                     username: req.session.username,
+                    walluser: req.params.user,
                     posts: data,
                 });
             }
         });
     });
 };
-
-var getWall = function (req, res) {
-	loginProtectedRoute(req, res, () => {
-		db.get_posts_w(req.params.user, function(err, data) {
-			if (err) {
-				console.log(err);
-			} else {
-				res.render('wall.ejs', {
-					username: req.session.username,
-					walluser: req.params.user,
-					posts: data,
-				});
-			}
-		});
-	});
-}
 /*if (req.session.username) {
         db.update_last_online(req.session.username);
         //user is logged in, should be sent to the homepage
@@ -216,7 +209,7 @@ var openChat = function (req, res) {
                             res.render('chat.ejs', {
                                 messages: data,
                                 chatid: req.query.chatid,
-								username: req.session.username
+                                username: req.session.username,
                             });
                         });
                     } else {
@@ -241,7 +234,20 @@ var getMessages = function (req, res) {
 
 var getUserPage = function (req, res) {
     loginProtectedRoute(req, res, () => {
-        res.render('userpage.ejs', { person: req.params.user });
+        if (req.params.user == 'mywall') {
+            req.params.user = req.session.username;
+        }
+        db.check_valid_user(req.params.user, function (err, data) {
+            if (err || data.Count == 0) {
+                res.redirect('/');
+            } else {
+                res.render('userpage.ejs', {
+                    me: req.session.username,
+                    person: req.params.user,
+                    mywall: req.params.user == req.session.username,
+                });
+            }
+        });
     });
 };
 
@@ -307,6 +313,42 @@ var sendMessage = function (req, res) {
         );
     }
 };
+
+var post_a_post = function (req, res) {
+    req.body.username = req.session.username;
+    loginProtectedRoute(req, res, () => {
+        db.post_a_post(req.body, function (err, data) {
+            res.send(data);
+        });
+    });
+};
+var get_posts = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        db.get_posts_by_user(req.query.username, function (err, data) {
+            res.send(data);
+        });
+    });
+};
+
+var get_wall_posts = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        db.get_posts_to_wall(req.query.wall, function (err, data) {
+            res.send(data);
+        });
+    });
+};
+
+var delete_post = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        if (req.session.username != req.body.username) {
+            res.send('Failed');
+            return;
+        }
+        db.delete_post(req.body, function (err, data) {
+            res.send(data);
+        });
+    });
+};
 /*
     Wraps all routes that require login so they always redirect to same place
     Update last online time
@@ -321,15 +363,17 @@ var loginProtectedRoute = function (req, res, callback) {
 };
 
 var newChat = function (req, res) {
-	if(!req.session.username) {
-		res.redirect('/login?error=0');
-	} else {
-		db.get_friends(req.session.username, function(err, data) {
-			res.render('newchat.ejs', {username: req.session.username, friends: data});
-		});
-	}
+    if (!req.session.username) {
+        res.redirect('/login?error=0');
+    } else {
+        db.get_friends(req.session.username, function (err, data) {
+            res.render('newchat.ejs', {
+                username: req.session.username,
+                friends: data,
+            });
+        });
+    }
 };
-
 
 var routes = {
     home_page: getHome,
@@ -341,7 +385,7 @@ var routes = {
     edit_user_account: editAccount,
     update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
-	wall: getWall,
+    wall: getWall,
     get_chats: getChats,
     test_chats: testChats,
     get_chat: openChat,
@@ -360,7 +404,11 @@ var routes = {
     signout: signout,
     get_visualizer_page: get_visualizer_page,
     get_visualizer_data: get_visualizer_data,
-	new_chat: newChat,
+    new_chat: newChat,
+    post_a_post: post_a_post,
+    get_posts: get_posts,
+    delete_post: delete_post,
+    get_wall_posts: get_wall_posts,
 };
 
 module.exports = routes;

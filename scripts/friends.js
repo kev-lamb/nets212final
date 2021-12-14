@@ -22,7 +22,7 @@ function loadFriends() {
                                         60
                                 );
                                 if (diff >= 5) {
-                                    // Users with actions within 5 seconds are considered online
+                                    // Users with actions within 5 minutes are considered online
                                     return `<a href="/user/${queryResults.user}" style="display: block">${queryResults.user} (last online ${diff} minutes ago)</a>`;
                                 } else {
                                     return `<a href="/user/${queryResults.user}" style="display: block">${queryResults.user} <span style="color: green">(online)</span></a>`;

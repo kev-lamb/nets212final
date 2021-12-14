@@ -53,6 +53,28 @@ var myDB_login_check = function (inputUname, inputPword, callback) {
     });
 };
 
+var check_valid_user = function (username, callback) {
+    let params = {
+        TableName: 'users',
+        KeyConditionExpression: '#un = :uname',
+        ExpressionAttributeNames: {
+            '#un': 'username',
+        },
+        ExpressionAttributeValues: {
+            ':uname': {
+                S: username,
+            },
+        },
+    };
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
 // Add a new item to the users table if the input username does not already exist
 var myDB_new_acc_check = function (inputData, callback) {
     console.log(
@@ -271,8 +293,8 @@ var myDB_get_posts_homepage = function (username, callback) {
                 console.log(data.Items[i].friend.S);
                 params = {
                     TableName: 'posts',
-                    IndexName: 'poster-postid-index',
-                    KeyConditionExpression: 'poster = :friend',
+                    IndexName: 'postee-poster-index',
+                    KeyConditionExpression: 'postee = :friend',
                     FilterExpression: 'postee <> :username',
                     ExpressionAttributeValues: {
                         ':friend': { S: data.Items[i].friend.S },
@@ -291,7 +313,7 @@ var myDB_get_posts_homepage = function (username, callback) {
             params = {
                 TableName: 'posts',
                 KeyConditionExpression: 'postee = :username',
-                FilterExpression: 'poster <> :username',
+                FilterExpression: 'postee <> :username',
                 ExpressionAttributeValues: {
                     ':username': { S: username },
                 },
@@ -593,7 +615,6 @@ var myDB_search_partial_update = function (
 };
 
 var myDB_search_partial = function (searchTerm, callback) {
-    console.log('search partial');
     let params = {
         TableName: 'search',
         Key: {
@@ -784,6 +805,99 @@ var get_friends_visualizer = function (username, nodeid, callback) {
     });
 };
 
+var post_a_post = function (inputData, callback) {
+    let d = new Date();
+    let params = {
+        TableName: 'posts',
+        Item: {
+            poster: {
+                S: inputData.username,
+            },
+            title: {
+                S: inputData.title,
+            },
+            content: {
+                S: inputData.content,
+            },
+            time: {
+                N: d.getTime().toString(),
+            },
+        },
+    };
+    if (inputData.wall) {
+        params.Item.wall = {
+            S: inputData.wall,
+        };
+    }
+    db.putItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var get_posts_by_user = function (username, callback) {
+    let params = {
+        TableName: 'posts',
+        KeyConditionExpression: 'poster = :username',
+        ExpressionAttributeValues: {
+            ':username': {
+                S: username,
+            },
+        },
+    };
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var get_posts_to_wall = function (wall, callback) {
+    let params = {
+        TableName: 'posts',
+        IndexName: 'wall-index',
+        KeyConditionExpression: 'wall = :wall',
+        ExpressionAttributeValues: {
+            ':wall': {
+                S: wall,
+            },
+        },
+    };
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var delete_post = function (data, callback) {
+    let params = {
+        TableName: 'posts',
+        Key: {
+            poster: {
+                S: data.username,
+            },
+            time: {
+                N: data.time,
+            },
+        },
+    };
+    db.deleteItem(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
 /*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
@@ -821,6 +935,11 @@ var database = {
     update_last_online: update_last_online,
     check_last_online: check_last_online,
     get_friends_visualizer: get_friends_visualizer,
+    check_valid_user: check_valid_user,
+    post_a_post: post_a_post,
+    get_posts_by_user: get_posts_by_user,
+    delete_post: delete_post,
+    get_posts_to_wall: get_posts_to_wall,
 };
 
 module.exports = database;
