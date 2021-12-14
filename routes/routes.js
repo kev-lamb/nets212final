@@ -11,27 +11,35 @@ If the user is not logged in, should send them to the login page
  */
 
 var getHome = function (req, res) {
-    loginProtectedRoute(req, res, () => {
-        if (req.session.username) {
-            db.update_last_online(req.session.username);
-            //user is logged in, should be sent to the homepage
-            //sending with username so homepage can be personalized to the logged in user
-            db.get_posts_hp(req.session.username, function (err, data) {
-                if (err) {
-                    console.log(err);
-                } else {
-                    res.render('home.ejs', {
-                        username: req.session.username,
-                        posts: data,
-                    });
-                }
-            });
-        } else {
-            //no user is logged in, should be sent to the login page
-            res.redirect('/login');
-        }
+    loginProtectedRoute(req, res, () => {  
+        db.get_posts_hp(req.session.username, function (err, data) {
+            if (err) {
+                console.log(err);
+            } else {
+                res.render('home.ejs', {
+                    username: req.session.username,
+                    posts: data,
+                });
+            }
+        });
     });
 };
+
+var getWall = function (req, res) {
+	loginProtectedRoute(req, res, () => {
+		db.get_posts_w(req.params.user, function(err, data) {
+			if (err) {
+				console.log(err);
+			} else {
+				res.render('wall.ejs', {
+					username: req.session.username,
+					walluser: req.params.user,
+					posts: data,
+				});
+			}
+		});
+	});
+}
 /*if (req.session.username) {
         db.update_last_online(req.session.username);
         //user is logged in, should be sent to the homepage
@@ -322,6 +330,7 @@ var routes = {
     edit_user_account: editAccount,
     update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
+	wall: getWall,
     get_chats: getChats,
     test_chats: testChats,
     get_chat: openChat,

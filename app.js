@@ -30,6 +30,9 @@ app.post('/createaccount', routes.new_account_check);
 // check login page
 app.post('/checklogin', routes.login_check);
 
+// wall page
+app.post('/wall/:user', routes.wall);
+
 // user account page
 app.get('/account', routes.user_account);
 
