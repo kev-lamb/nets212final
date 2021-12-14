@@ -77,6 +77,12 @@ app.get('/chat', routes.get_chat);
 //dummy route to test chat functionality
 app.get('/testchat', routes.test_chats);
 
+// create a new chat
+app.post('/createchat', routes.create_chat);
+
+// get the title of a chat with a given id
+app.get('/data/chat/titles/:chatid', routes.get_title);
+
 // get search page
 app.get('/search', routes.get_search_users);
 
@@ -106,6 +112,9 @@ app.post('/removefriend', routes.remove_friend);
 
 //post get all friends
 app.post('/getfriends', routes.get_friends);
+
+// get your friends
+app.get('/yourfriends', routes.yourfriends);
 
 //post get last online status
 app.post('/lastonline/:user', routes.last_online_user);

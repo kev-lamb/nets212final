@@ -28,9 +28,10 @@ var getWall = function (req, res) {
                     username: req.session.username,
                     walluser: req.params.user,
                     posts: data,
+
                 });
-            }
-        });
+			}
+        });    
     });
 };
 /*if (req.session.username) {
@@ -206,11 +207,15 @@ var openChat = function (req, res) {
                     if (data) {
                         //user is in the group, fetch the messages from this group and display them
                         db.get_chat(req.query.chatid, function (err, data) {
-                            res.render('chat.ejs', {
-                                messages: data,
-                                chatid: req.query.chatid,
-                                username: req.session.username,
-                            });
+
+							db.get_title(req.query.chatid, function(err, title) {
+                            	res.render('chat.ejs', {
+                                	messages: data,
+                                	chatid: req.query.chatid,
+									username: req.session.username,
+									title: title["chatName"].S
+                            	});
+							})
                         });
                     } else {
                         //user is not in the group/doesnt have permission, so redirect to the list of their chats
@@ -363,16 +368,54 @@ var loginProtectedRoute = function (req, res, callback) {
 };
 
 var newChat = function (req, res) {
-    if (!req.session.username) {
-        res.redirect('/login?error=0');
-    } else {
-        db.get_friends(req.session.username, function (err, data) {
-            res.render('newchat.ejs', {
-                username: req.session.username,
-                friends: data,
-            });
-        });
-    }
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		res.render('newchat.ejs', {username: req.session.username});
+	}
+};
+
+var createChat = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		var members = [];
+		members.push(req.session.username);
+		console.log(req.body);
+		for(item in req.body) {
+			if(item != 'title') {
+				members.push(item);
+			}
+			console.log(item);
+		}
+		db.create_chat(req.body.title, members, function(err, data) {
+			res.redirect("/testchat");
+		});
+	}
+};
+
+var yourfriends = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		//fetch all of the current users friends
+		db.get_friends(req.session.username, function (err, data) {
+        	res.send(data);
+    	});
+		
+	}
+};
+
+var get_title = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		console.log(req.params);
+		db.get_title(req.params.chatid, function(err, data) {
+			console.log(data);
+			res.send(data);
+		});
+	}
 };
 
 var routes = {
@@ -393,7 +436,6 @@ var routes = {
     send_message: sendMessage,
     get_search_users: searchForUsers,
     get_partial_search_users: loadPartialUserList,
-    get_chats: getChats,
     friends_page: getFriends,
     user_page: getUserPage,
     checkfriendstatus: checkFriendStatus,
@@ -404,11 +446,14 @@ var routes = {
     signout: signout,
     get_visualizer_page: get_visualizer_page,
     get_visualizer_data: get_visualizer_data,
-    new_chat: newChat,
     post_a_post: post_a_post,
     get_posts: get_posts,
     delete_post: delete_post,
     get_wall_posts: get_wall_posts,
+	new_chat: newChat,
+	create_chat: createChat,
+	yourfriends: yourfriends,
+	get_title: get_title,
 };
 
 module.exports = routes;
