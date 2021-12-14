@@ -748,6 +748,112 @@ var check_last_online = function (username, callback) {
     });
 };
 
+var create_chat = function (title, members, callback) {
+	//going to use similar methodology to random "unique" ids as was used for message ids
+	//get the timestamp
+    var today = new Date();
+	//we must add 0s in front of months and days that are single digits so order is maintained
+	//in the database properly (13 would be placed ahead of 6 otherwise for example)
+	var month = today.getMonth() + 1;
+	if(month < 10) {month = '0'+month;}
+	var day = today.getDate();
+	if(day < 10) {day = '0'+day;}
+	
+	//putting all the time data together to create the timestamp and sortkey
+    var timestamp =
+        today.getFullYear() +
+        '-' +
+        month +
+        '-' +
+        day +
+        '-' +
+        today.getHours() +
+        ':' +
+        today.getMinutes() +
+        ':' +
+        today.getSeconds();
+
+	//ugly timestamp with only alphanumerics so the chatid can go in a url
+	var timestampUGLY = today.getFullYear() + month + day + today.getHours() + today.getMinutes() + today.getSeconds();
+	//generates a randomstring of 16 characters
+    var uid = crypto.randomBytes(16).toString('hex').slice(16);
+	var chatid = uid+timestampUGLY;
+
+	var params = {
+        Item: {
+            chatID: {
+                S: chatid,
+            },
+            sortkey: {
+                S: 'config',
+            },
+            createdAt: {
+                S: timestamp,
+            },
+			chatName: {
+				S: title,
+			}
+        },
+        TableName: 'chats',
+        ReturnValues: 'NONE',
+    };
+	db.putItem(params, function(err, data) {
+		if(err) {
+			callback(err, null);
+		} else {
+			console.log("made the config row");
+			//now we need to add all members to the chat
+			for (i in members) {
+				console.log("adding member");
+				let params = {
+					Item: {
+            			chatID: {
+                			S: chatid,
+            			},
+            			sortkey: {
+                			S: 'member_'+members[i],
+            			},
+            			createdAt: {
+                			S: timestamp,
+            			},
+        			},
+        			TableName: 'chats',
+        			ReturnValues: 'NONE',
+				};
+				db.putItem(params, function(err, data) {
+					if(err) {console.log(err);}
+				});
+			}
+			callback(err, data);
+		}
+	})
+	
+};
+
+var get_title = function(chatid, callback) {
+	params = {
+        TableName: 'chats',
+        KeyConditionExpression:
+            'chatID = :chatid and sortkey = :msg',
+        ExpressionAttributeValues: {
+            ':chatid': { S: chatid },
+            ':msg': { S: 'config' },
+        },
+    };
+
+	db.query(params, function (err, data) {
+        if (err) {
+            console.log(err);
+        }
+        //console.log(data);
+		if(data){
+			callback(err, data.Items[0]);
+		} else {
+			callback(err, data);
+		}
+    });
+}
+
 /*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
@@ -784,6 +890,8 @@ var database = {
     check_friend_status: myDB_check_friend_status,
     update_last_online: update_last_online,
     check_last_online: check_last_online,
+	create_chat: create_chat,
+	get_title: get_title,
 };
 
 module.exports = database;
