@@ -14,6 +14,18 @@ app.use(
 );
 app.use(express.static('scripts'));
 app.use(express.static('css'));
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
+
+io.on('connection', socket => {
+	console.log("a user connected");
+	socket.on('send-chat-message', data => {
+		console.log("server received a message");
+		console.log(data.message);
+		socket.broadcast.emit('chat-message', {message: data.message, user: data.username, chatid: data.chatid});
+	});
+});
+
 
 // home page is first page we see
 app.get('/', routes.home_page);
@@ -29,6 +41,9 @@ app.post('/createaccount', routes.new_account_check);
 
 // check login page
 app.post('/checklogin', routes.login_check);
+
+// wall page
+app.post('/wall/:user', routes.wall);
 
 // user account page
 app.get('/account', routes.user_account);
@@ -50,6 +65,8 @@ app.post('/sendmessage', routes.send_message);
 
 // get a specific subset of chats
 app.get('/chats', routes.get_chats);
+
+app.get('/newchat', routes.new_chat);
 
 //go to the page of a specific chat
 app.get('/chat', routes.get_chat);
@@ -97,7 +114,7 @@ app.get('/friendvisualizer', routes.get_visualizer_page);
 app.get('/friendvisualizationdata/:nodeid', routes.get_visualizer_data);
 
 console.log('Author: G31');
-app.listen(8080);
+http.listen(8080);
 console.log(
     'Server running on port 8080. Now open http://localhost:8080/ in your browser!'
 );

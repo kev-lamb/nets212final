@@ -11,27 +11,35 @@ If the user is not logged in, should send them to the login page
  */
 
 var getHome = function (req, res) {
-    loginProtectedRoute(req, res, () => {
-        if (req.session.username) {
-            db.update_last_online(req.session.username);
-            //user is logged in, should be sent to the homepage
-            //sending with username so homepage can be personalized to the logged in user
-            db.get_posts_hp(req.session.username, function (err, data) {
-                if (err) {
-                    console.log(err);
-                } else {
-                    res.render('home.ejs', {
-                        username: req.session.username,
-                        posts: data,
-                    });
-                }
-            });
-        } else {
-            //no user is logged in, should be sent to the login page
-            res.redirect('/login');
-        }
+    loginProtectedRoute(req, res, () => {  
+        db.get_posts_hp(req.session.username, function (err, data) {
+            if (err) {
+                console.log(err);
+            } else {
+                res.render('home.ejs', {
+                    username: req.session.username,
+                    posts: data,
+                });
+            }
+        });
     });
 };
+
+var getWall = function (req, res) {
+	loginProtectedRoute(req, res, () => {
+		db.get_posts_w(req.params.user, function(err, data) {
+			if (err) {
+				console.log(err);
+			} else {
+				res.render('wall.ejs', {
+					username: req.session.username,
+					walluser: req.params.user,
+					posts: data,
+				});
+			}
+		});
+	});
+}
 /*if (req.session.username) {
         db.update_last_online(req.session.username);
         //user is logged in, should be sent to the homepage
@@ -208,6 +216,7 @@ var openChat = function (req, res) {
                             res.render('chat.ejs', {
                                 messages: data,
                                 chatid: req.query.chatid,
+								username: req.session.username
                             });
                         });
                     } else {
@@ -281,7 +290,6 @@ var get_visualizer_data = function (req, res) {
 };
 
 var sendMessage = function (req, res) {
-    console.log('we are in the post function');
     if (!req.session.username) {
         res.redirect('/login?error=0');
     } else {
@@ -312,6 +320,17 @@ var loginProtectedRoute = function (req, res, callback) {
     }
 };
 
+var newChat = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		db.get_friends(req.session.username, function(err, data) {
+			res.render('newchat.ejs', {username: req.session.username, friends: data});
+		});
+	}
+};
+
+
 var routes = {
     home_page: getHome,
     login_page: getLogin,
@@ -322,6 +341,7 @@ var routes = {
     edit_user_account: editAccount,
     update_account_check: updateAccount,
     get_user_profile: loadUserProfile,
+	wall: getWall,
     get_chats: getChats,
     test_chats: testChats,
     get_chat: openChat,
@@ -340,6 +360,7 @@ var routes = {
     signout: signout,
     get_visualizer_page: get_visualizer_page,
     get_visualizer_data: get_visualizer_data,
+	new_chat: newChat,
 };
 
 module.exports = routes;

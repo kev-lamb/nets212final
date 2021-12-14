@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h1><%walluser%>'s Wall</h1>
+  <table>
+        <tr>
+            <th>Poster</th>
+            <th>Time</th>
+            <th>Content</th>
+        </tr>
+        <% posts.forEach(function(item) { %>
+        <tr>
+            <td><%= item.poster.S %></td>
+            <td><%= item.time.S %></td>
+            <td><%= item.content.S %></td>
+        </tr>
+        <% }); %>
+    </table><br>
+  
+  <font color="red"><%= message %><p> <br>
+  <font color="black">
+  <i> Add a new post below! </i> <br>
+  <form action="/addpost" method="post">
+  	<label for="lat">Latitude:</label>
+    <input type="text" id="lat" name="latitude">
+    
+    <label for="long">Longitude:</label>
+    <input type="text" id="long" name="longitude">
+    
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name">
+    
+    <label for="desc">Description:</label>
+    <input type="text" id="desc" name="description">
+    
+    <input type="submit" value="Add">
+  </form>
+  
+  <a href="/logout">Logout</a>
+  
+</body>
+</html>

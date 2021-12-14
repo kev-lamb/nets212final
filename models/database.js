@@ -2,6 +2,7 @@ var AWS = require('aws-sdk');
 AWS.config.update({ region: 'us-east-1' });
 var db = new AWS.DynamoDB();
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 // Verify that the provided login information matches an item in the users table
 var myDB_login_check = function (inputUname, inputPword, callback) {
@@ -220,7 +221,7 @@ var myDB_get_posts_wall = function (username, callback) {
         if (err) {
             callback(err, null);
         } else {
-            out.concat(data.Items);
+            out = out.concat(data.Items);
         }
     });
 
@@ -238,11 +239,10 @@ var myDB_get_posts_wall = function (username, callback) {
         if (err) {
             callback(err, null);
         } else {
-            out.concat(data.Items);
+            out = out.concat(data.Items);
+            callback(null, out);
         }
     });
-
-    callback(null, out);
 };
 
 var myDB_get_posts_homepage = function (username, callback) {
@@ -287,98 +287,112 @@ var myDB_get_posts_homepage = function (username, callback) {
                     }
                 });
             }
-        }
-    });
+            //get posts to username
+            params = {
+                TableName: 'posts',
+                KeyConditionExpression: 'postee = :username',
+                FilterExpression: 'poster <> :username',
+                ExpressionAttributeValues: {
+                    ':username': { S: username },
+                },
+            };
 
-    //get posts to username
-    params = {
-        TableName: 'posts',
-        KeyConditionExpression: 'postee = :username',
-        FilterExpression: 'poster <> :username',
-        ExpressionAttributeValues: {
-            ':username': { S: username },
-        },
-    };
+            db.query(params, function (err, data) {
+                if (err) {
+                    callback(err, null);
+                } else {
+                    out = out.concat(data.Items);
+                    //get posts from username
+                    params = {
+                        TableName: 'posts',
+                        IndexName: 'poster-postid-index',
+                        KeyConditionExpression: 'poster = :username',
+                        ExpressionAttributeValues: {
+                            ':username': { S: username },
+                        },
+                    };
 
-    db.query(params, function (err, data) {
-        if (err) {
-            callback(err, null);
-        } else {
-            out = out.concat(data.Items);
-        }
-    });
-
-    //get posts from username
-    params = {
-        TableName: 'posts',
-        IndexName: 'poster-postid-index',
-        KeyConditionExpression: 'poster = :username',
-        ExpressionAttributeValues: {
-            ':username': { S: username },
-        },
-    };
-
-    db.query(params, function (err, data) {
-        if (err) {
-            callback(err, null);
-        } else {
-            console.log(out);
-            out = out.concat(data.Items);
-            console.log(out);
-            callback(null, out);
+                    db.query(params, function (err, data) {
+                        if (err) {
+                            callback(err, null);
+                        } else {
+                            console.log(out);
+                            out = out.concat(data.Items);
+                            console.log(out);
+                            callback(null, out);
+                        }
+                    });
+                }
+            });
         }
     });
 };
 
 var myDB_post = function (title, content, poster, postee, callback) {
-    let current = new Date();
-    let cDate =
-        current.getFullYear() +
-        '-' +
-        (current.getMonth() + 1) +
-        '-' +
-        current.getDate();
-    let cTime =
-        current.getHours() +
-        ':' +
-        current.getMinutes() +
-        ':' +
-        current.getSeconds();
-    let dateTime = cDate + ' ' + cTime;
     let params = {
-        TableName: 'posts',
-        Item: {
-            title: {
-                S: title,
-            },
-            content: {
-                S: content,
-            },
-            poster: {
-                S: poster,
-            },
-            postee: {
-                S: postee,
-            },
-            time: {
-                S: dateTime,
-            },
-            postid: {
-                S: poster + cTime,
-            },
+        TableName: 'friends',
+        KeyConditionExpression: '#user = :username',
+        ExpressionAttributeNames: {
+            '#user': 'user',
+        },
+        ExpressionAttributeValues: {
+            ':username': { S: username },
         },
     };
-    db.putItem(params, function (err, data) {
+    db.query(params, function (err, data) {
         if (err) {
-            console.log(err);
+            callback(err, null);
+        } else {
+            let current = new Date();
+            let cDate =
+                current.getFullYear() +
+                '-' +
+                (current.getMonth() + 1) +
+                '-' +
+                current.getDate();
+            let cTime =
+                current.getHours() +
+                ':' +
+                current.getMinutes() +
+                ':' +
+                current.getSeconds();
+            let dateTime = cDate + ' ' + cTime;
+            let params = {
+                TableName: 'posts',
+                Item: {
+                    title: {
+                        S: title,
+                    },
+                    content: {
+                        S: content,
+                    },
+                    poster: {
+                        S: poster,
+                    },
+                    postee: {
+                        S: postee,
+                    },
+                    time: {
+                        S: dateTime,
+                    },
+                    postid: {
+                        S: poster + cTime,
+                    },
+                },
+            };
+            db.putItem(params, function (err, data) {
+                if (err) {
+                    console.log(err);
+                }
+                callback(err, data);
+            });
         }
-        callback(err, data);
     });
 };
 
 var get_users_chats = function (user, callback) {
-    console.log('looking for chats containing user');
-    console.log(user);
+    //console.log('looking for chats containing user');
+    //console.log(user);
     //get chats containing user
     params = {
         TableName: 'chats',
@@ -393,8 +407,8 @@ var get_users_chats = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            console.log('found chats');
-            console.log(data);
+            //console.log('found chats');
+            //console.log(data);
             callback(err, data.Items);
         }
     });
@@ -404,9 +418,9 @@ var get_users_chats = function (user, callback) {
 Searches the Chats table for specific chat and checks if the given user is in the chat.
 If the user is in the chat, data contains TRUE. Otherwise, data contains FALSE */
 var in_chat = function (user, chatid, callback) {
-    console.log(
-        'checking if user ' + user + ' has access to chat with id ' + chatid
-    );
+    //console.log(
+    //'checking if user ' + user + ' has access to chat with id ' + chatid
+    //);
     params = {
         TableName: 'chats',
         KeyConditionExpression: 'chatID = :chatid and sortkey = :sortkey',
@@ -425,7 +439,7 @@ var in_chat = function (user, chatid, callback) {
 };
 
 var get_chat = function (chatid, callback) {
-    console.log('retreiving message from chat with id ' + chatid);
+    //console.log('retreiving message from chat with id ' + chatid);
     params = {
         TableName: 'chats',
         KeyConditionExpression:
@@ -440,8 +454,8 @@ var get_chat = function (chatid, callback) {
         if (err) {
             console.log(err);
         }
-        console.log('no errors');
-        console.log(data);
+        console.log('found ' + data.Items.length + ' messages');
+        //console.log(data);
         callback(err, data);
     });
 };
@@ -454,15 +468,27 @@ using nodes native crypto module. The message id doesnt have to be super long as
 in the rare case that two messages are sent by different users at the exact same time.
  */
 var send_message = function (chatid, message, user, callback) {
-    console.log('adding new message to chat ' + chatid);
+    //console.log('adding new message to chat ' + chatid);
     //get the timestamp
     var today = new Date();
+    //we must add 0s in front of months and days that are single digits so order is maintained
+    //in the database properly (13 would be placed ahead of 6 otherwise for example)
+    var month = today.getMonth() + 1;
+    if (month < 10) {
+        month = '0' + month;
+    }
+    var day = today.getDate();
+    if (day < 10) {
+        day = '0' + day;
+    }
+
+    //putting all the time data together to create the timestamp and sortkey
     var timestamp =
         today.getFullYear() +
         '-' +
-        (today.getMonth() + 1) +
+        month +
         '-' +
-        today.getDate() +
+        day +
         '-' +
         today.getHours() +
         ':' +
