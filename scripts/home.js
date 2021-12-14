@@ -62,6 +62,12 @@ function loadPost() {
             })
             .then((promises) => Promise.all(promises))
     );
+    data = {
+        wall: person,
+    };
+    promisesBigQuery.push(
+        $.get('/getwallposts', data).then((ret) => ret.Items)
+    );
     Promise.all(promisesBigQuery).then((results) => {
         let arr = results[0];
         for (result of results[1]) {
@@ -75,6 +81,16 @@ function loadPost() {
                     arr.push(item);
             }
         }
+        arr = [...arr, ...results[2]];
+        console.log(arr);
+        arr = arr.filter(
+            (post, index, self) =>
+                index ===
+                self.findIndex(
+                    (t) =>
+                        t.poster.S === post.poster.S && t.time.N === post.time.N
+                )
+        );
         arr.sort((a, b) => a.time.N - b.time.N);
         for (item of arr.reverse()) {
             content += createPost(item);
