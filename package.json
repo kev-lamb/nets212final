@@ -13,6 +13,7 @@
       "ejs": "*",
       "express": "*",
       "express-session": "^1.17.2",
-      "lru-cache": "*"
+      "lru-cache": "*",
+      "socket.io": "^4.4.0"
    }
 }

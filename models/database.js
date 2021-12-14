@@ -377,8 +377,8 @@ var myDB_post = function (title, content, poster, postee, callback) {
 };
 
 var get_users_chats = function (user, callback) {
-    console.log('looking for chats containing user');
-    console.log(user);
+    //console.log('looking for chats containing user');
+    //console.log(user);
     //get chats containing user
     params = {
         TableName: 'chats',
@@ -393,8 +393,8 @@ var get_users_chats = function (user, callback) {
         if (err) {
             callback(err, null);
         } else {
-            console.log('found chats');
-            console.log(data);
+            //console.log('found chats');
+            //console.log(data);
             callback(err, data.Items);
         }
     });
@@ -404,9 +404,9 @@ var get_users_chats = function (user, callback) {
 Searches the Chats table for specific chat and checks if the given user is in the chat.
 If the user is in the chat, data contains TRUE. Otherwise, data contains FALSE */
 var in_chat = function (user, chatid, callback) {
-    console.log(
-        'checking if user ' + user + ' has access to chat with id ' + chatid
-    );
+    //console.log(
+        //'checking if user ' + user + ' has access to chat with id ' + chatid
+    //);
     params = {
         TableName: 'chats',
         KeyConditionExpression: 'chatID = :chatid and sortkey = :sortkey',
@@ -425,7 +425,7 @@ var in_chat = function (user, chatid, callback) {
 };
 
 var get_chat = function (chatid, callback) {
-    console.log('retreiving message from chat with id ' + chatid);
+    //console.log('retreiving message from chat with id ' + chatid);
     params = {
         TableName: 'chats',
         KeyConditionExpression:
@@ -440,8 +440,8 @@ var get_chat = function (chatid, callback) {
         if (err) {
             console.log(err);
         }
-        console.log('no errors');
-        console.log(data);
+        console.log('found '+data.Items.length+' messages');
+        //console.log(data);
         callback(err, data);
     });
 };
@@ -454,15 +454,23 @@ using nodes native crypto module. The message id doesnt have to be super long as
 in the rare case that two messages are sent by different users at the exact same time.
  */
 var send_message = function (chatid, message, user, callback) {
-    console.log('adding new message to chat ' + chatid);
+    //console.log('adding new message to chat ' + chatid);
     //get the timestamp
     var today = new Date();
+	//we must add 0s in front of months and days that are single digits so order is maintained
+	//in the database properly (13 would be placed ahead of 6 otherwise for example)
+	var month = today.getMonth() + 1;
+	if(month < 10) {month = '0'+month;}
+	var day = today.getDate();
+	if(day < 10) {day = '0'+day;}
+	
+	//putting all the time data together to create the timestamp and sortkey
     var timestamp =
         today.getFullYear() +
         '-' +
-        (today.getMonth() + 1) +
+        month +
         '-' +
-        today.getDate() +
+        day +
         '-' +
         today.getHours() +
         ':' +
