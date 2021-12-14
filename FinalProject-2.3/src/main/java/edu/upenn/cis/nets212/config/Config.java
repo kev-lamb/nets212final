@@ -13,13 +13,9 @@ package edu.upenn.cis.nets212.config;
 public class Config {
 
 	/**
-	 * The path to the space-delimited social network data
+	 * The path to the news feed data
 	 */
-	public static String NEWS_FEED_PATH = "https://penn-cis545-files.s3.amazonaws.com/News_Category_Dataset_v2.json";
-	
-	public static String SOCIAL_NET_PATH = "s3a://penn-cis545-files/twitter_combined.txt";
-	
-	public static String BIGGER_SOCIAL_NET_PATH = "s3a://penn-cis545-files/soc-LiveJournal1.txt";
+	public static String NEWS_FEED_PATH = "target/News_Category_Dataset_v2.json";
 	
 	public static String LOCAL_SPARK = "local[*]";
 
@@ -27,4 +23,23 @@ public class Config {
 	 * How many RDD partitions to use?
 	 */
 	public static int PARTITIONS = 5;
+	
+	/**
+	 * If we set up a local DynamoDB server, where does it listen?
+	 */
+	public static int DYNAMODB_LOCAL_PORT = 8000;
+
+	/**
+	 * This is the connection to the DynamoDB server. 
+	 */
+	public static String DYNAMODB_URL = "https://dynamodb.us-east-1.amazonaws.com";
+	//		"https://dynamodb.us-east-1.amazonaws.com";
+	
+	/**
+	 * Do we want to use the local DynamoDB instance or a remote one?
+	 * 
+	 * If we are local, performance is really slow - so you should switch
+	 * to the real thing as soon as basic functionality is in place.
+	 */
+	public static Boolean LOCAL_DB = false;
 }

@@ -1,7 +1,35 @@
-package edu.upenn.cis.nets212.hw3;
+package edu.upenn.cis.nets212.hw5;
 
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.dynamodbv2.document.DynamoDB;
+import com.amazonaws.services.dynamodbv2.document.Item;
+import com.amazonaws.services.dynamodbv2.document.ItemCollection;
+import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
+import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
+import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
+import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
+import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
+import com.amazonaws.services.dynamodbv2.model.ResourceInUseException;
+import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
+import com.amazonaws.services.dynamodbv2.model.ScanRequest;
+import com.amazonaws.services.dynamodbv2.document.Table;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
+import com.amazonaws.services.dynamodbv2.document.spec.ScanSpec;
+
+import com.google.gson.*;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 
+import java.time.LocalDate;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -19,9 +47,13 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
+import org.json4s.jackson.*;
+
 import edu.upenn.cis.nets212.config.Config;
+import edu.upenn.cis.nets212.storage.DynamoConnector;
 import edu.upenn.cis.nets212.storage.SparkConnector;
 import scala.Tuple2;
+import software.amazon.awssdk.services.dynamodb.model.DynamoDbException;
 
 public class ArticleAdsorption {
 	/**
@@ -36,220 +68,238 @@ public class ArticleAdsorption {
 	
 	JavaSparkContext context;
 	
+	/**
+	 * Connection to DynamoDB
+	 */
+	DynamoDB db;
+	
+	Table users;
+	
+	Table friends;
+	
+	Table news;
+	
+	Table likes;
+	
+	Table recommended;
+	
+	// A static graph that will be constructed from the static News DynamoDB table.
+	JavaPairRDD<Tuple2<Node, Node>, Double> articleCategoryGraph; 
+	
 	public ArticleAdsorption() {
 		System.setProperty("file.encoding", "UTF-8");
 	}
+	
+	/**
+	 * Creates and initializes the News, Likes, and Recommended DynamoDB tables invoked in 2.3.
+	 * 
+	 * @throws DynamoDbException
+	 * @throws InterruptedException
+	 */
+	private void initializeTables() throws DynamoDbException, InterruptedException {
+		try {
+			news = db.createTable("News", Arrays.asList(new KeySchemaElement("link", KeyType.HASH)),																				     
+					Arrays.asList(new AttributeDefinition("link", ScalarAttributeType.S), 
+							new AttributeDefinition("likes", ScalarAttributeType.S), 
+							new AttributeDefinition("category", ScalarAttributeType.S), 
+							new AttributeDefinition("headline", ScalarAttributeType.S), 
+							new AttributeDefinition("authors", ScalarAttributeType.S), 
+							new AttributeDefinition("short_description", ScalarAttributeType.S), 
+							new AttributeDefinition("date", ScalarAttributeType.S)),
+					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
+
+			news.waitForActive();
+		} catch (final ResourceInUseException exists) {
+			news = db.getTable("News");
+		}
+		
+		try {
+			likes = db.createTable("Likes", 
+					Arrays.asList(new KeySchemaElement("UserID", KeyType.HASH), 
+							new KeySchemaElement("link", KeyType.RANGE)), 																			         
+					Arrays.asList(new AttributeDefinition("UserID", ScalarAttributeType.S),
+							new AttributeDefinition("link", ScalarAttributeType.S)),
+					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
+
+			likes.waitForActive();
+		} catch (final ResourceInUseException exists) {
+			likes = db.getTable("Likes");
+		}
+		
+		try {
+			recommended = db.createTable("Recommended", 
+					Arrays.asList(new KeySchemaElement("User_ID", KeyType.HASH), 
+							new KeySchemaElement("link", KeyType.RANGE)), 																			         
+					Arrays.asList(new AttributeDefinition("User_ID", ScalarAttributeType.S),
+							new AttributeDefinition("link", ScalarAttributeType.S)),
+					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
+			recommended.waitForActive();
+		} catch (final ResourceInUseException exists) {
+			recommended = db.getTable("Recommended");
+		}
+
+	}
 
 	/**
-	 * Initialize the database connection and open the file
+	 * Initialize the spark and database connections.
+	 * Create and initialize the News, Likes, and Recommended DynamoDB tables.
 	 * 
 	 * @throws IOException
 	 * @throws InterruptedException 
 	 */
 	public void initialize() throws IOException, InterruptedException {
-		logger.info("Connecting to Spark...");
-
+		logger.info("Connecting to Spark...");		
 		spark = SparkConnector.getSparkConnection();
-		context = SparkConnector.getSparkContext();
+		context = SparkConnector.getSparkContext();		
+		logger.debug("Connected to Spark!");
 		
-		logger.debug("Connected!");
+		
+		logger.info("Connecting to DynamoDB...");	
+		db = DynamoConnector.getConnection(Config.DYNAMODB_URL);	
+		logger.debug("Connected to DynamoDB!");
+		
+		
+		users = db.getTable("Users");
+		friends = db.getTable("Friends");
+		initializeTables(); // Assigns references to the news, likes, and recommended Table fields. 	
 	}
 	
 	/**
-	 * A helper class to define each node type (user, category, article) all under a single object.
+	 * ****This method should not be called more than once.****
 	 * 
-	 * @author nets212
-	 */
-	private class Node {
-		
-		// "user", "category", or "article".
-		private String type;
-		
-		// <Username>, <Category>, <Headline>.
-		private String name;
-		
-		// Set to a date with format "YYYY-MM-DD" iff type = "article".
-		private String publishDate = "N/A";
-		
-		// Set to a URL iff type = "article".
-		private String link = "N/A";
-		
-		// Map<Username, Score> held independently by each node (including the user nodes).
-		// This holds the finalized LabelMap after an iteration of absorption is complete.
-		private Map<String, Double> postIterLabelMap;
-		
-		// This holds the mid-processing LabelMap during the completion of an iteration.
-		// After an iteration is complete, we will set postIterLabelMap -> midIterLabelMap,
-		// and reset the values of midIterLabelMap to 0.0. 
-		private Map<String, Double> midIterLabelMap;
-		
-		private Node(String name, String type) {
-			this.name = name;
-			this.type = type;
-			
-			this.postIterLabelMap = new HashMap<>();
-			this.midIterLabelMap = new HashMap<>();
-		}
-		
-		// *Scale the postIterLabelMap's values by an input edgeWeight, in a newly-created Map.*
-		// (In preparation for propagating this scaled LabelMap to an out-neighbor Node.)
-		private Map<String, Double> edgeScaleMap(double edgeWeight) {
-			
-			Map<String, Double> scaledMap = new HashMap<>();
-			
-			Iterator<Entry<String, Double>> iter = postIterLabelMap.entrySet().iterator();
-			while (iter.hasNext()) {
-				Entry<String, Double> entry = iter.next();
-				String user = entry.getKey();
-				Double entryScore = entry.getValue();
-				scaledMap.put(user, entryScore * edgeWeight);
-			}
-			
-			return scaledMap;
-		}
-		
-		// *Add an input LabelMap to the midIterLabelMap; addition is value by value.*
-		// (Called with an edgeScaledMap input from an in-neighbor as the input, for
-		// each edge in the Graph RDD. Additionally, called towards the end of an iteration,
-		// when coalescing each Node object (of potentially many) that represents the same
-		// vertex in the graph, creating a single Node object for that vertex with a
-		// single midIterLabelMap that is built by accumulation.)
-		private void addLabelMap(Map<String, Double> inputMap) {
-			
-			Iterator<Entry<String, Double>> inputIter = inputMap.entrySet().iterator();
-			while (inputIter.hasNext()) {
-				Entry<String, Double> inputEntry = inputIter.next();
-				String user = inputEntry.getKey();
-				Double inputScore = inputEntry.getValue();
-				
-				Double currScore = midIterLabelMap.get(user);
-				midIterLabelMap.put(user, currScore + inputScore);
-			}
-		}
-		
-		// *Normalize the user scores of the midIterLabelMap.* 
-		// (Used at the conclusion of an iteration, on each coalesced Node object.)
-		private void normalizeLabelMap() {
-			
-			// Sum the scores across all users.
-			Double scoreSum = 0.0;
-			
-			Iterator<Entry<String, Double>> firstIter = midIterLabelMap.entrySet().iterator();
-			while (firstIter.hasNext()) {
-				Entry<String, Double> entry = firstIter.next();
-				Double entryScore = entry.getValue();
-				scoreSum += entryScore;
-			}
-			
-			// Scale each score by (1 / scoreSum).
-			Iterator<Entry<String, Double>> secondIter = midIterLabelMap.entrySet().iterator();
-			while (secondIter.hasNext()) {
-				Entry<String, Double> entry = secondIter.next();
-				String user = entry.getKey();
-				Double entryScore = entry.getValue();
-				midIterLabelMap.put(user, entryScore / scoreSum);
-			}
-		}
-		
-		// *Zero the user scores of the midIterLabelMap.*
-		// (Used on each to_node of the network to prepare for the next iteration.)
-		// (Subtle difference between the manual re-zeroing in finalizeLabelMap().)
-		private void zeroLabelMap() {
-			Iterator<Entry<String, Double>> iter = midIterLabelMap.entrySet().iterator();
-			while (iter.hasNext()) {
-				Entry<String, Double> entry = iter.next();
-				String user = entry.getKey();
-				midIterLabelMap.put(user, 0.0);
-			}
-		}
-		
-		// *Accurately sets postIterLabelMap, and re-zeros the values of midIterLabelMap.* 
-		// (Called at the conclusion of an iteration, on each coalesced Node object.) 
-		private void finalizeLabelMap() {
-			// Normalize the midIterLabelMap.
-			normalizeLabelMap();
-			
-			// Set postIterLabelMap -> midIterLabelMap.
-			postIterLabelMap = midIterLabelMap;
-			
-			// Re-zero the values of midIterLabelMap.
-			midIterLabelMap = new HashMap<>();
-			Iterator<Entry<String, Double>> iter = postIterLabelMap.entrySet().iterator();
-			while (iter.hasNext()) {
-				Entry<String, Double> entry = iter.next();
-				String user = entry.getKey();
-				midIterLabelMap.put(user, 0.0);
-			}
-		}
-		
-	    @Override
-	    public boolean equals(Object o) {
-	 
-	        if (o == this) {
-	            return true;
-	        }
-
-	        if (!(o instanceof Node)) {
-	            return false;
-	        }
-	         
-	        Node node = (Node) o;
-	        
-	        /*
-	         * We don't bother to check for the equality of the LabelMaps: we will
-	         * ensure that *every Node instance that intends to represent the same 
-	         * vertex of the graph (i.e., there will be one Node instance for each
-	         * time the vertex appears in the Graph RDD multiple times) has the 
-	         * same postIterLabelMap at the end of each iteration.
-	         * 
-	         * (*): more on that on line __.
-	         *  
-	         * We determine if two Node instances represent the same vertex in the 
-	         * graph through our definition of structural equality below:
-	         */
-	        return (this.name.equals(node.name) && this.type.equals(node.type));
-	    }
-	}
-	
-	/**
-	 * Fetch the news feed data from the S3 path, and create a directed edge list PairRDD with:
-	 * - article nodes for articles published on the input <date> or earlier
+	 * Populate the News DynamoDB table, and create the static articleCategoryGraph 
+	 * from the static News DynamoDB table, in accordance with the following guidelines:
+	 * 
 	 * - category nodes for every news article category
 	 * - article nodes connected to their corresponding category nodes (and vice versa)
 	 * - for every category node c: all (c,a) edges have equal weights which sum to 0.5. 
 	 * - for every article node a: all (a,c) edges have equal weights which sum to 0.5. 
 	 * 
-	 * The input <date> should be provided in "YYYY-MM-DD" format. Additionally, four years should 
-	 * be added to each article's publish date when interpreting it. 
+	 * ***The filtering by date will occur within the getNewsFeedNetwork() method.***
 	 * 
-	 * @param filePath
-	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
+	 * Sets the "articleCategoryGraph" field equal to a JavaPairRDD <Tuple2<from_node, to_node>, edge_weight>
+	 * graph of the News table, consisting of (a, c) and (c, a) nodes. The edge weights will be
+	 * initialized properly in accordance with the guidelines in getNewsFeedNetwork().
+	 * @throws IOException
 	 */
-	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String filePath, String date) {
-		// TODO: Complete this method. (Query the News Table.)
+	void getAllArticleCategoryData(String filePath) throws IOException {
+		String line;
+		BufferedReader reader = new BufferedReader(new FileReader(new File(filePath)));
+		JsonParser parser = new JsonParser();
 		
-		/*
-		JavaRDD<String[]> file = context.textFile(filePath, Config.PARTITIONS)
-				.map(line -> line.toString().replace('\t', ' '))
-				.map(line -> line.split(" "));
-		*/
+		boolean status = true;
 		
-		// *Ensure that each Node initially has a LabelMap mapping each user to 0.0.* 
-		// (Both postIter and midIter.)
+		List<String> jsonFileFields = new ArrayList<String>();
+		jsonFileFields.add("link");
+		jsonFileFields.add("category");
+		jsonFileFields.add("headline");
+		jsonFileFields.add("authors");
+		jsonFileFields.add("short_description");
+		jsonFileFields.add("date");
 		
-		// Additionally, set the publishDate and link fields for any article node created.
+		// A list to be accumulated and soon converted to a PairRDD<Tuple2<Node, Node>, Double>
+		// through a context.parallelizePairs() call.
+		List<Tuple2<Tuple2<Node, Node>, Double>> listEdgeWithWeight = new ArrayList<>();;
 		
-		long numEdges = 0;
-		long numNodes = 0;
+		while (status) {
+			line = reader.readLine();
+			
+			if (line == null) {
+				status = false;
+				break;
+			}
+			
+			JsonElement jsonTree = parser.parse(line);
+			JsonObject jsonObject = jsonTree.getAsJsonObject();
+			
+			Item item = new Item(); // The new Item to be added to the News table.
+			
+			Node articleNode = null;  // The new article Node to be added to the edge RDD.
+			Node categoryNode = null; // The new category Node to be added to the edge RDD.
+			
+			for (int i = 0; i < 6; i++) {
+				String currField = jsonFileFields.get(i);
+				JsonPrimitive jsonPrimitive = jsonObject.getAsJsonPrimitive(currField);
+				String jsonFieldString = jsonPrimitive.getAsString();
+				
+				// currField.equals("link")
+				if (i == 0) {		
+					item.withPrimaryKey("link", jsonFieldString);
+					
+					articleNode = new Node(jsonFieldString, "article");
+				}
+				
+				// currField.equals("category")
+				if (i == 1) {
+					item.withString("category", jsonFieldString);
+					
+					categoryNode = new Node(jsonFieldString, "category");
+				}
+				
+				// currField.equals("headline")
+				if (i == 2) {
+					item.withString("headline", jsonFieldString);
+				}
+
+				// currField.equals("authors")
+				if (i == 3) {
+					item.withString("authors", jsonFieldString);
+				}				
+				
+				// currField.equals("short_description")
+				if (i == 4) {
+					item.withString("short_description", jsonFieldString);
+				}
+				
+				// currField.equals("date")
+				if (i == 5) {
+					item.withString("date", jsonFieldString);
+					
+					articleNode.publishDate = jsonFieldString;
+				}							
+			}
+			
+			// Add the new Item to the News table.
+			news.putItem(item);
+			
+			// Create two Tuple2<Node, Node>, Double> values to represent the symmetric
+			// edges along with an edge_weight (a placeholder 1.0). Add them to the accumulated list.
+			
+			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
+				(new Tuple2<Node, Node>(articleNode, categoryNode), 1.0);
+			
+			Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
+			(new Tuple2<Node, Node>(categoryNode, articleNode), 1.0);
+			
+			listEdgeWithWeight.add(directionOne);
+			listEdgeWithWeight.add(directionTwo);
+			
+		}
 		
-		System.out.println("This graph contains " + String.valueOf(numNodes) + " nodes and "
-				+ String.valueOf(numEdges) + " edges.");
+		reader.close();
 		
-		return null;
+		// Convert listEdgeWithWeight to a PairRDD.
+		JavaPairRDD<Tuple2<Node, Node>, Double> articleCategoryGraph = context.parallelizePairs(listEdgeWithWeight);
+		
+		// TODO: Properly initialize the edge weights (in accordance with the guidelines).
+		// (I.e., no more placeholder "1.0" edge weights.)
+		
+		this.articleCategoryGraph = articleCategoryGraph;
 	}
 	
 	/**
-	 * Fetch the user data from the DynamoDB tables, and create a directed edge list PairRDD with:
+	 * Fetch the news feed data from the S3 path, and the user/article data from the DynamoDB tables,
+	 * and create a directed edge list PairRDD with:
+	 * - article nodes for articles published on the input <date> or earlier
+	 * - category nodes for every news article category
+	 * - article nodes connected to their corresponding category nodes (and vice versa)
+	 * - for every category node c: all (c,a) edges have equal weights which sum to 0.5. 
+	 * - for every article node a: all (a,c) edges have equal weights which sum to 0.5.
+	 *  
+	 * ^^^getAllArticleCategoryData() performs all the above EXCEPT the filtering by date.^^^
+	 * ** This method will perform the filtering by date. ** 
+	 * 
+	 * Additionally:
 	 * - user nodes for each user 
 	 * - user nodes connected to their friends (and vice versa)
 	 * - user nodes connected to the category nodes that they are interested in (vice versa)
@@ -259,16 +309,16 @@ public class ArticleAdsorption {
 	 *     - all (u,c) edges have equal weights which sum to 0.3.
 	 *     - all (u,a) edges have equal weights which sum to 0.4.
 	 * 
+	 * (The input <date> should be provided in "YYYY-MM-DD" format. Additionally, four years should 
+	 * be added to each article's publish date when interpreting it.) 
+	 * 
+	 * @param filePath
+	 * @param date
 	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
 	 */
-	JavaPairRDD<Tuple2<Node, Node>, Double> getUserNetwork() {
-		// TODO: Complete this method. (Query the Users Table, Likes Table.)
+	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String filePath, String date) {
+		// TODO: Complete this method. (Invoke getAllArticleCategoryData(), Query the user-related tables.)
 		
-		/*
-		JavaRDD<String[]> file = context.textFile(filePath, Config.PARTITIONS)
-				.map(line -> line.toString().replace('\t', ' '))
-				.map(line -> line.split(" "));
-		*/
 		
 		// *Ensure that each Node initially has a LabelMap mapping each user to 0.0.* 
 		// (both postIter and midIter), *unless* the node is a user node, where then
@@ -276,11 +326,97 @@ public class ArticleAdsorption {
 		
 		// Additionally, set the publishDate and link fields for any article node created.
 		
-		long numEdges = 0;
-		long numNodes = 0;
+		// Lists to be accumulated and soon converted to multiple PairRDD<Tuple2<Node, Node>, Double>'s
+		// through context.parallelizePairs() calls.
+		List<Tuple2<Tuple2<Node, Node>, Double>> userUserWeightList = new ArrayList<>();
+		List<Tuple2<Tuple2<Node, Node>, Double>> userCategoryWeightList = new ArrayList<>();
+		List<Tuple2<Tuple2<Node, Node>, Double>> userArticleWeightList = new ArrayList<>();
+	    
+		// TODO: Are these proper scans??
 		
-		System.out.println("This graph contains " + String.valueOf(numNodes) + " nodes and "
-				+ String.valueOf(numEdges) + " edges.");
+		// Scan the Friends table to create (u, u') edges.
+		ItemCollection<ScanOutcome> friendsResults = friends.scan(new ScanSpec());
+		Iterator<Item> itemIter = friendsResults.iterator();
+		
+		 while (itemIter.hasNext()) {
+             Item item = itemIter.next();
+             String userOneName = item.getString("User");
+             String userTwoName = item.getString("Friend");
+             
+             Node userOneNode = new Node(userOneName, "user");
+             Node userTwoNode = new Node(userTwoName, "user");
+             
+            // Edge weights initially given 1.0 as a placeholder. 
+ 			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
+				(new Tuple2<Node, Node>(userOneNode, userTwoNode), 1.0);
+			
+			Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
+			(new Tuple2<Node, Node>(userTwoNode, userOneNode), 1.0);
+			
+			userUserWeightList.add(directionOne);
+			userUserWeightList.add(directionTwo);
+         }
+		
+		// Scan the Users table to create (u, c) and (c, u) edges.
+		ItemCollection<ScanOutcome> usersResults = users.scan(new ScanSpec());
+		itemIter = usersResults.iterator();
+		
+		 while (itemIter.hasNext()) {
+             Item item = itemIter.next();
+             String username = item.getString("User");
+             Node userNode = new Node(username, "user");
+             
+             List<String> interestList = item.getList("List of Interests");
+             
+             Iterator<String> interestListIter = interestList.iterator();
+             while (interestListIter.hasNext()) {
+            	 String categoryName = interestListIter.next();
+            	 Node categoryNode = new Node(categoryName, "category");
+            	
+            	// Edge weights initially given 1.0 as a placeholder. 
+      			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
+     				(new Tuple2<Node, Node>(userNode, categoryNode), 1.0);
+     			
+     			Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
+     			(new Tuple2<Node, Node>(categoryNode, userNode), 1.0); 
+     			
+     			userCategoryWeightList.add(directionOne);
+     			userCategoryWeightList.add(directionTwo);
+             }
+         }
+		
+		// Scan the Likes table to create (u, a) and (a, u) edges.
+		ItemCollection<ScanOutcome> likesResults = likes.scan(new ScanSpec());
+		itemIter = likesResults.iterator();
+		
+		 while (itemIter.hasNext()) {
+             Item item = itemIter.next();
+             String username = item.getString("User");
+             String link = item.getString("link");
+             
+             Node userNode = new Node(username, "user");
+             Node articleNode = new Node(link, "article");
+             
+         	// Edge weights initially given 1.0 as a placeholder. 
+   			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
+  				(new Tuple2<Node, Node>(userNode, articleNode), 1.0);
+  			
+  			Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
+  			(new Tuple2<Node, Node>(articleNode, userNode), 1.0); 
+  			
+  			userArticleWeightList.add(directionOne);
+  			userArticleWeightList.add(directionTwo);
+         }
+		
+		 JavaPairRDD<Tuple2<Node, Node>, Double> userUserGraph = context.parallelizePairs(userUserWeightList);
+		 JavaPairRDD<Tuple2<Node, Node>, Double> userCategoryGraph = context.parallelizePairs(userCategoryWeightList);
+		 JavaPairRDD<Tuple2<Node, Node>, Double> userArticleGraph = context.parallelizePairs(userArticleWeightList);
+		
+		// TODO: Properly initialize the edge weights (in accordance with the guidelines).
+		// (I.e., no more placeholder "1.0" edge weights.)
+		
+		
+		 // union call at the very end with everything and the articleCategoryGraph field.
 		
 		return null;
 	}
@@ -304,14 +440,10 @@ public class ArticleAdsorption {
 	public Node run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
 		logger.info("Running");
 
-        // Load the news feed network (no user data).
-		JavaPairRDD<Tuple2<Node, Node>, Double> noUsers = getNewsFeedNetwork(Config.NEWS_FEED_PATH, date);
+		// Load the network.
+		JavaPairRDD<Tuple2<Node, Node>, Double> network = getNewsFeedNetwork(Config.NEWS_FEED_PATH, date);
 		
-		// Load the users network.
-		JavaPairRDD<Tuple2<Node, Node>, Double> withUsers = getUserNetwork();
-		
-		// Combine into an overall network.
-		JavaPairRDD<Tuple2<Node, Node>, Double> network = withUsers.union(noUsers).distinct();
+		// .filter() to clear out edges with bad-dated articles??
 		
 		/*
 		 * Conduct the adsorption algorithm on the network.
@@ -333,8 +465,8 @@ public class ArticleAdsorption {
 		// postIterLabelMaps for each of its nodes. 
 		JavaRDD<Node> nonSourceNodes = nodes.subtract(sourceNodes);
 		
-		// (Defined outside the scope of the upcoming while loop merely so it may be invoked
-		// after the while loop. Irrelevant value at the moment.)
+		// (Variable defined outside the scope of the upcoming while loop merely so it may be 
+		// invoked after the while loop. Irrelevant value at the moment.)
 		JavaRDD<Node> updatedNonSourceNodes = nonSourceNodes;
 		
 		/*
@@ -437,7 +569,11 @@ public class ArticleAdsorption {
 			// to how it appears in updatedNonSourceNodes (to have an up-to-date postIterLabelMap
 			// for propagating in the upcoming iteration).
 			
-			JavaRDD<Node> updatedFromNodes = updatedNonSourceNodes.union(sourceNodes);
+			JavaRDD<Node> updatedNonSrcFromNodes = updatedNonSourceNodes.subtract(toNodes);
+			
+			// Recall: The source nodes are always exclusively from_nodes. A from_node is 
+			// any node that appears in the 1st Node column in the edge network <Node, Node>.
+			JavaRDD<Node> updatedFromNodes = updatedNonSrcFromNodes.union(sourceNodes);
 			
 			// (Created to permit the upcoming join(). No new information.)
 			// (Expresses updatedFromNodes as PairRDD to permit joining.)
@@ -469,11 +605,6 @@ public class ArticleAdsorption {
 			// (To refer back to it in the upcoming iteration, when testing for convergence.)
 			nonSourceNodes = updatedNonSourceNodes;
 			
-			// To preserve the value of iterationCount for console printing accuracy.
-			if (iterationCount == iMax) {
-				break;
-			}
-			
 			iterationCount += 1;
 		}
 		
@@ -488,7 +619,7 @@ public class ArticleAdsorption {
 				.filter(node -> node.type.equals("article") && node.publishDate.equals(date));
 		
 		// TODO: Filter out the articles that were already recommended to the <inputUser>.
-		// (Query the Likes table.)
+		// (Query the Recommended Table. Perhaps create another RDD<Node> and use subtract().)
 		JavaRDD<Node> validArticles = todaysArticles;
 		
 		// Extract the <inputUser> score from each article's postIterLabelMap.
@@ -515,8 +646,10 @@ public class ArticleAdsorption {
 		
 		// 2) Complete the weighted selection using an EnumeratedDistribution object.
 		Node selectedNode = new EnumeratedDistribution<Node>(asPairList).sample();
+		
+		// TODO: Upload the link of selectedNode to the Recommended Table.
 			
-		logger.info("*** Finished absorption algorithm! ***");
+		logger.info("*** Finished adsorption algorithm! ***");
 		
 		return selectedNode;
 	}
@@ -530,6 +663,8 @@ public class ArticleAdsorption {
 
 		if (spark != null)
 			spark.close();
+		
+		DynamoConnector.shutdown();
 	}
 	
 	// Private class whose call() method is invoked in the aggregateByKey() method 
@@ -552,15 +687,197 @@ public class ArticleAdsorption {
 					Entry<String, Double> entry = iter.next();
 					String user = entry.getKey();
 					Double score = entry.getValue();
-					Double otherMapScore = val.get(user);
 					
-					sumMap.put(user, score + otherMapScore);
+					Double valMapScore = val.get(user);
+		            if (valMapScore != null) {
+		            	sumMap.put(user, score + valMapScore);
+		            } else {
+		            	// The valMapScore may be interpreted as 0.0.
+		            	// (An absence of a <User, Score> entry in any LabelMap is
+		            	// equivalent to a mapping of <User, 0.0>.)
+		            	sumMap.put(user, score);
+		            }	
+				}
+				
+				// We must now consider the user entries that appear in the valMap
+				// but do NOT appear in the rowMap.
+				
+				iter = val.entrySet().iterator();
+				while (iter.hasNext()) {
+					Entry<String, Double> entry = iter.next();
+					String user = entry.getKey();
+					Double score = entry.getValue();
+					
+					Double rowMapScore = row.get(user);
+		            if (rowMapScore == null) {
+		            	sumMap.put(user, score);
+		            } 
 				}
 				
 				return sumMap;				
 			}
 		}
 		
+	}
+	
+	/**
+	 * A helper class to define each node type (user, category, article) all under a single object.
+	 * 
+	 * @author nets212
+	 */
+	private class Node {
+		
+		// "user", "category", or "article".
+		private String type;
+		
+		// <Username>, <Category>, or <Link>.
+		private String name;
+		
+		// Set to a date with format "YYYY-MM-DD" iff type = "article".
+		private String publishDate = "N/A";
+		
+		// Map<Username, Score> held independently by each node (including the user nodes).
+		// This holds the finalized LabelMap after an iteration of absorption is complete.
+		private Map<String, Double> postIterLabelMap;
+		
+		// This holds the mid-processing LabelMap during the completion of an iteration.
+		// After an iteration is complete, we will set postIterLabelMap -> midIterLabelMap,
+		// and reset the values of midIterLabelMap to 0.0. 
+		private Map<String, Double> midIterLabelMap;
+		
+		private Node(String name, String type) {
+			this.name = name;
+			this.type = type;
+			
+			this.postIterLabelMap = new HashMap<>();
+			this.midIterLabelMap = new HashMap<>();
+			
+			if (type.equals("user")) {
+				postIterLabelMap.put(name, 1.0);
+			}
+		}
+		
+		// *Scale the postIterLabelMap's values by an input edgeWeight, in a newly-created Map.*
+		// (In preparation for propagating this scaled LabelMap to an out-neighbor Node.)
+		private Map<String, Double> edgeScaleMap(double edgeWeight) {
+			
+			Map<String, Double> scaledMap = new HashMap<>();
+			
+			Iterator<Entry<String, Double>> iter = postIterLabelMap.entrySet().iterator();
+			while (iter.hasNext()) {
+				Entry<String, Double> entry = iter.next();
+				String user = entry.getKey();
+				Double entryScore = entry.getValue();
+				scaledMap.put(user, entryScore * edgeWeight);
+			}
+			
+			return scaledMap;
+		}
+		
+		// *Add an input LabelMap to the midIterLabelMap; addition is value by value.*
+		// (Called with an edgeScaledMap input from an in-neighbor as the input, for
+		// each edge in the Graph RDD.)
+		private void addLabelMap(Map<String, Double> inputMap) {
+			
+			Iterator<Entry<String, Double>> inputIter = inputMap.entrySet().iterator();
+			while (inputIter.hasNext()) {
+				Entry<String, Double> inputEntry = inputIter.next();
+				String user = inputEntry.getKey();
+				Double inputScore = inputEntry.getValue();
+				
+				Double currScore = this.midIterLabelMap.get(user);
+				if (currScore != null) {
+					this.midIterLabelMap.put(user, currScore + inputScore);		
+				} else {
+					// "this" Node had not heard of the user until this point!
+					// Update the midIterLabelMap to include an entry <user, inputScore>.
+					// (I.e., currScore was effectively 0.0 beforehand.)
+					this.midIterLabelMap.put(user, inputScore);	
+				}
+			}
+		}
+		
+		// *Normalize the user scores of the midIterLabelMap.* 
+		// (Used at the conclusion of an iteration, on each coalesced Node object.)
+		private void normalizeLabelMap() {
+			
+			// Sum the scores across all users.
+			Double scoreSum = 0.0;
+			
+			Iterator<Entry<String, Double>> firstIter = midIterLabelMap.entrySet().iterator();
+			while (firstIter.hasNext()) {
+				Entry<String, Double> entry = firstIter.next();
+				Double entryScore = entry.getValue();
+				scoreSum += entryScore;
+			}
+			
+			// Scale each score by (1 / scoreSum).
+			Iterator<Entry<String, Double>> secondIter = midIterLabelMap.entrySet().iterator();
+			while (secondIter.hasNext()) {
+				Entry<String, Double> entry = secondIter.next();
+				String user = entry.getKey();
+				Double entryScore = entry.getValue();
+				midIterLabelMap.put(user, entryScore / scoreSum);
+			}
+		}
+		
+		// *Zero the user scores of the midIterLabelMap.*
+		// (Used on each to_node of the network to prepare for the next iteration.)
+		private void zeroLabelMap() {
+			Iterator<Entry<String, Double>> iter = midIterLabelMap.entrySet().iterator();
+			while (iter.hasNext()) {
+				Entry<String, Double> entry = iter.next();
+				String user = entry.getKey();
+				midIterLabelMap.put(user, 0.0);
+			}
+		}
+		
+		// *Accurately sets postIterLabelMap, and re-zeros the values of midIterLabelMap.* 
+		// (Called at the conclusion of an iteration, on each coalesced Node object.) 
+		private void finalizeLabelMap() {
+			// Normalize the midIterLabelMap.
+			normalizeLabelMap();
+			
+			// Set postIterLabelMap -> midIterLabelMap.
+			Iterator<Entry<String, Double>> iter = midIterLabelMap.entrySet().iterator();
+			while (iter.hasNext()) {
+				Entry<String, Double> entry = iter.next();
+				String user = entry.getKey();
+				Double entryScore = entry.getValue();
+				postIterLabelMap.put(user, entryScore);
+			}
+			
+			// Re-zero the values of midIterLabelMap.
+			zeroLabelMap(); // Unnecessary??
+		}
+		
+	    @Override
+	    public boolean equals(Object o) {
+	 
+	        if (o == this) {
+	            return true;
+	        }
+
+	        if (!(o instanceof Node)) {
+	            return false;
+	        }
+	         
+	        Node node = (Node) o;
+	        
+	        /*
+	         * We don't bother to check for the equality of the LabelMaps: we will
+	         * ensure that *every Node instance that intends to represent the same 
+	         * vertex of the graph (i.e., there will be one Node instance for each
+	         * time the vertex appears in the Graph RDD multiple times) has the 
+	         * same postIterLabelMap at the end of each iteration.
+	         * 
+	         * (*): more on that on line __.
+	         *  
+	         * We determine if two Node instances represent the same vertex in the 
+	         * graph through our definition of structural equality below:
+	         */
+	        return (this.name.equals(node.name) && this.type.equals(node.type));
+	    }
 	}
 	
 }
