@@ -216,6 +216,7 @@ var openChat = function (req, res) {
                             res.render('chat.ejs', {
                                 messages: data,
                                 chatid: req.query.chatid,
+								username: req.session.username
                             });
                         });
                     } else {
@@ -289,7 +290,6 @@ var get_visualizer_data = function (req, res) {
 };
 
 var sendMessage = function (req, res) {
-    console.log('we are in the post function');
     if (!req.session.username) {
         res.redirect('/login?error=0');
     } else {
@@ -320,6 +320,17 @@ var loginProtectedRoute = function (req, res, callback) {
     }
 };
 
+var newChat = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		db.get_friends(req.session.username, function(err, data) {
+			res.render('newchat.ejs', {username: req.session.username, friends: data});
+		});
+	}
+};
+
+
 var routes = {
     home_page: getHome,
     login_page: getLogin,
@@ -349,6 +360,7 @@ var routes = {
     signout: signout,
     get_visualizer_page: get_visualizer_page,
     get_visualizer_data: get_visualizer_data,
+	new_chat: newChat,
 };
 
 module.exports = routes;
