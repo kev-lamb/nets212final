@@ -1,5 +1,5 @@
 var socket = io();
-var chatid = -1;
+var chatid = null;
 var username = null;
 var chat = null;
 var messageInput = null;
@@ -49,6 +49,10 @@ function appendMessage(message, username) {
 
 async function loadData(chatid) {
     return $.getJSON('/data/chat?chatid='+chatid);
+}
+
+async function getTitle(chatnum) {
+	return $.getJSON('/data/chat/titles/'+chatnum);
 }
 
 async function fetchMessages() {

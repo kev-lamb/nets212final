@@ -774,21 +774,18 @@ var check_last_online = function (username, callback) {
 };
 
 var create_chat = function (title, members, callback) {
-    //going to use similar methodology to random "unique" ids as was used for message ids
-    //get the timestamp
-    var today = new Date();
-    //we must add 0s in front of months and days that are single digits so order is maintained
-    //in the database properly (13 would be placed ahead of 6 otherwise for example)
-    var month = today.getMonth() + 1;
-    if (month < 10) {
-        month = '0' + month;
-    }
-    var day = today.getDate();
-    if (day < 10) {
-        day = '0' + day;
-    }
 
-    //putting all the time data together to create the timestamp and sortkey
+	//going to use similar methodology to random "unique" ids as was used for message ids
+	//get the timestamp
+    var today = new Date();
+	//we must add 0s in front of months and days that are single digits so order is maintained
+	//in the database properly (13 would be placed ahead of 6 otherwise for example)
+	var month = today.getMonth() + 1;
+	if(month < 10) {month = '0'+month;}
+	var day = today.getDate();
+	if(day < 10) {day = '0'+day;}
+	
+	//putting all the time data together to create the timestamp and sortkey
     var timestamp =
         today.getFullYear() +
         '-' +
@@ -1006,6 +1003,7 @@ var delete_post = function (data, callback) {
         }
     });
 };
+
 var get_title = function (chatid, callback) {
     params = {
         TableName: 'chats',
@@ -1016,11 +1014,10 @@ var get_title = function (chatid, callback) {
         },
     };
 
-    db.query(params, function (err, data) {
+	db.query(params, function (err, data) {
         if (err) {
             console.log(err);
         }
-        //console.log(data);
         if (data) {
             callback(err, data.Items[0]);
         } else {
@@ -1028,6 +1025,7 @@ var get_title = function (chatid, callback) {
         }
     });
 };
+
 var get_friends_visualizer = function (username, nodeid, callback) {
     myDB_data_user_profile(username, function (err, data) {
         let userAffiliation = data.Item.affiliation.S;
@@ -1059,6 +1057,7 @@ var get_friends_visualizer = function (username, nodeid, callback) {
         });
     });
 };
+
 /*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
