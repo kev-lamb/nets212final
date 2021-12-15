@@ -11,6 +11,7 @@
             src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
         ></script>
         <script src="account.js"></script>
+        <script src="signup.js"></script>
         <style>
             body {
                 padding-top: 40px;
@@ -59,6 +60,23 @@
                 <div class="list-group-item">
                     <h4 class="list-group-item-heading">Birthday</h4>
                     <p class="list-group-item-text" id="birthday"></p>
+                </div>
+                <div class="list-group-item">
+                    <h4 class="list-group-item-heading">Interests</h4>
+                    <p class="list-group-item-text" id="interests">
+                        <select
+                            name="newsInterest"
+                            id="newsInterest"
+                            multiple
+                            class="form-select"
+                            aria-label="multiple select example"
+                            disabled="disabled"
+                        >
+                            <option disabled selected value>
+                                -- select an option --
+                            </option>
+                        </select>
+                    </p>
                 </div>
             </ul>
             <a href="/editaccount" class="btn btn-lg btn-primary btn-block"

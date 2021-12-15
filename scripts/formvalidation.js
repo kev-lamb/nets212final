@@ -9,7 +9,7 @@ function FormValidation(formId) {
     var completed = true;
     for (var i = 0, element; (element = elements[i++]); ) {
         element.classList.remove('incorrect');
-        if (element.value === '') {
+        if (element.type != 'hidden' && element.value === '') {
             console.log(element.id);
             element.classList.add('incorrect');
             completed = false;

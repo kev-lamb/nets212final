@@ -133,6 +133,9 @@ var myDB_new_acc_check = function (inputData, callback) {
                                 birthday: {
                                     S: inputData.birthday,
                                 },
+                                newsInterests: {
+                                    S: inputData.newsInterest.toString(),
+                                },
                             },
                         };
                         // Add the new item to the users table
@@ -207,13 +210,17 @@ var update_user_profile = function (inputData, callback) {
                 'lastname = :lastname, ' +
                 'email = :email,' +
                 'affiliation = :affiliation, ' +
-                'birthday = :birthday',
+                'birthday = :birthday,' +
+                'newsInterests = :newsInterests',
             ExpressionAttributeValues: {
                 ':firstname': { S: inputData.firstname },
                 ':lastname': { S: inputData.lastname },
                 ':email': { S: inputData.email },
                 ':affiliation': { S: inputData.affiliation },
                 ':birthday': { S: inputData.birthday },
+                ':newsInterests': {
+                    S: inputData.newsInterest.toString(),
+                },
             },
             ReturnValues: 'UPDATED_NEW',
         };

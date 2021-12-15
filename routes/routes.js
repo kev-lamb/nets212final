@@ -59,7 +59,6 @@ var getLogin = function (req, res) {
 var loginCheck = function (req, res) {
     let username = req.body.username.trim();
     let password = req.body.password;
-
     db.login_check(username, password, function (err, data) {
         if (err) {
             res.redirect('/login?error=0');
@@ -79,6 +78,7 @@ var getSignup = function (req, res) {
 };
 
 var newAccCheck = function (req, res) {
+    console.log(req.body);
     db.new_acc_check(req.body, function (err, data) {
         if (err) {
             res.redirect('/signup?error=0');

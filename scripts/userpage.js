@@ -65,6 +65,7 @@ function setButton() {
         checkForPosts();
     });
 }
+
 function changeFriendStatus() {
     let data = {
         user: document.getElementById('otherperson').innerText,
