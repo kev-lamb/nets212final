@@ -899,6 +899,54 @@ var post_a_post = function (inputData, callback) {
     });
 };
 
+var comment_a_comment = function (inputData, callback) {
+    let d = new Date();
+    let params = {
+        TableName: 'comments',
+        Item: {
+            postid: {
+                S: inputData.postid,
+            },
+            poster: {
+                S: inputData.poster,
+            },
+            content: {
+                S: inputData.content,
+            },
+            time: {
+                N: d.getTime().toString(),
+            },
+        },
+    };
+    db.putItem(params, function (err, data) {
+        console.log(err, data);
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
+var get_comments = function (postid, callback) {
+    let params = {
+        TableName: 'comments',
+        KeyConditionExpression: 'postid = :postid',
+        ExpressionAttributeValues: {
+            ':postid': {
+                S: postid,
+            },
+        },
+    };
+    db.query(params, function (err, data) {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(err, data);
+        }
+    });
+};
+
 var get_posts_by_user = function (username, callback) {
     let params = {
         TableName: 'posts',
@@ -1050,7 +1098,9 @@ var database = {
     get_friends_visualizer: get_friends_visualizer,
     check_valid_user: check_valid_user,
     post_a_post: post_a_post,
+    comment_a_comment: comment_a_comment,
     get_posts_by_user: get_posts_by_user,
+    get_comments: get_comments,
     delete_post: delete_post,
     get_posts_to_wall: get_posts_to_wall,
     create_chat: create_chat,

@@ -322,9 +322,26 @@ var post_a_post = function (req, res) {
         });
     });
 };
+
+var comment_a_comment = function (req, res) {
+    req.body.poster = req.session.username;
+    loginProtectedRoute(req, res, () => {
+        db.comment_a_comment(req.body, function (err, data) {
+            res.send(data);
+        });
+    });
+};
 var get_posts = function (req, res) {
     loginProtectedRoute(req, res, () => {
         db.get_posts_by_user(req.query.username, function (err, data) {
+            res.send(data);
+        });
+    });
+};
+
+var get_comments = function (req, res) {
+    loginProtectedRoute(req, res, () => {
+        db.get_comments(req.query.postid, function (err, data) {
             res.send(data);
         });
     });
@@ -407,8 +424,10 @@ var routes = {
     new_chat: newChat,
     post_a_post: post_a_post,
     get_posts: get_posts,
+    get_comments: get_comments,
     delete_post: delete_post,
     get_wall_posts: get_wall_posts,
+    comment_a_comment: comment_a_comment,
 };
 
 module.exports = routes;

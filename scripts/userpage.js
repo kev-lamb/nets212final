@@ -13,12 +13,12 @@ function loadPage() {
 }
 function initButton() {
     setButton();
-    setInterval(() => setButton(), 5000);
+    setInterval(() => setButton(), 20000);
 }
 
 function initPost() {
     loadPost();
-    setInterval(() => loadPost(), 5000);
+    setInterval(() => loadPost(), 20000);
 }
 
 function setButton() {
@@ -81,8 +81,6 @@ function postNewPost(id) {
 }
 
 function loadPost() {
-    console.log(me);
-    console.log(person);
     let data = {
         username: person,
     };

@@ -119,8 +119,14 @@ app.get('/friendvisualizationdata/:nodeid', routes.get_visualizer_data);
 //post a post!
 app.post('/makeapost', routes.post_a_post);
 
+//post a comment!
+app.post('/makeacomment', routes.comment_a_comment);
+
 //get user posts
 app.get('/getposts', routes.get_posts);
+
+//get comments on posts
+app.get('/getcomments', routes.get_comments);
 
 //get posts to wall
 app.get('/getwallposts', routes.get_wall_posts);
