@@ -27,6 +27,7 @@
             integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
             crossorigin="anonymous"
         ></script>
+        <script src="/socket.io/socket.io.js"> </script>
         <script src="home.js"></script>
         <script src="/createPost.js"></script>
         <script src="formvalidation.js"></script>
@@ -88,8 +89,19 @@
                         <a href="/testchat">Chats</a>
                     </li>
                     <li class="breadcrumb-item">
+                        <a href="/invitations" id="invitesddd-tab"> </a>
+                    </li>
+                    
+                    <li class="breadcrumb-item">
                         <a href="/signout">Sign Out</a>
                     </li>
+                    
+                		<li class="nav-item dropdown">
+                    		<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" id="invites-tab">Invitations</a>
+                    		<div class="dropdown-menu" id="invites-dropdown">
+                    		</div>
+                		</li>
+            		
                 </ol>
             </nav>
             <button

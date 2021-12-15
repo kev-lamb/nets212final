@@ -1,5 +1,59 @@
+var socket = io();
+var invitations = 0;
+
+socket.on('invite-user', function(data) {
+	if(person == data.user_invited) {
+		console.log("received an invitation");
+		//increment the number displayed in the invites tab
+		invitations++;
+		let invites = document.getElementById("invites-tab");
+		invites.innerHTML = "Invites (" + invitations + ")";
+		
+		//add element to invites dropdown that allows user to join chat
+		title_parsed = data.chat_title;
+		if(title_parsed.length > 20) {
+			title_parsed = title_parsed.substring(0,17);
+			title_parsed = title_parsed.concat('...');
+		}
+		let dropdown = document.getElementById("invites-dropdown");
+		let tomato = document.createElement("a");
+			tomato.setAttribute("href", "#");
+			tomato.setAttribute("class", "dropdown-item");
+			tomato.setAttribute("style", "color: green");
+			tomato.setAttribute("onclick", "joinchat("+"'"+data.chatid + "'); return false;")
+			tomato.innerHTML = "Invitation to "+title_parsed + " from " + data.user_inviting;
+			dropdown.append(tomato);
+			
+		//<a href="#" class="dropdown-item" onclick="joinchat(chatid); return false;">Invitation to (title) from (user)</a>
+		
+	}
+});
+
+/*
+posts new membership to the chat with chatid, then redirects the user to this chat
+*/
+async function joinchat(chatid) {
+	
+	//post request to add member to the chat
+	$.post('/joinchat', {chatid: chatid}, function(data) {
+		if(data) {
+			window.location.href = "/chat?chatid="+chatid;
+		} else {
+			console.log("returned, but nothing happened");
+		}
+	});
+	
+	//redirect to the chat page
+	//window.location.href = "/chat?chatid="+chatid;
+}
+
 function loadPage() {
     initPost();
+
+	//make the invites 0
+	invitations = 0;
+	let invites = document.getElementById("invites-tab");
+	invites.innerHTML = "Invites (" + invitations + ")";
 }
 
 function initPost() {

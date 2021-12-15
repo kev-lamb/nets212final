@@ -79,6 +79,11 @@ async function getTitle(chatnum) {
 	return $.getJSON('/data/chat/titles/'+chatnum);
 }
 
+async function getChatters(chatid) {
+	return $.getJSON('/data/users/'+chatid);
+}
+
+
 async function fetchMessages() {
     let data = await loadData();
 	let table = document.getElementById('display');
@@ -126,6 +131,32 @@ async function populate_chat_onLoad(chatid){
 		
 		
 	}
+	
+	
+	//once chat has been populated, add all chat members as options in the chat member dropdown
+	let members = (await getChatters(chatid)).Items;
+	console.log(members);
+	let dropdown_menu = document.getElementById("members-dropdown");
+	for(i in members) {
+		//remove the member_ prefix to the sortkey
+		let curr_name = members[i]["sortkey"].S.slice(7);
+		console.log(curr_name);
+		
+		//compare name to user because we dont want their name to appear in the list
+		if(!(curr_name == username) ) {
+			//add name to the dropdown menu with a link back to their user page
+			console.log("trying to add the thing to the dropdown");
+			let tomato = document.createElement("a");
+			tomato.setAttribute("href", "/user/"+curr_name);
+			tomato.setAttribute("class", "dropdown-item");
+			tomato.innerHTML = curr_name;
+			dropdown_menu.append(tomato);
+			//<a href="/user/:username" class="dropdown-item">:username</a>
+		}
+	}
+	
+	get_online_friends();
+	
 };
 
 /*
@@ -149,12 +180,79 @@ async function send_message(chatid, message) {
 	messageInput.value = '';
 }
 
-//code for handling chat autoscrolling to most recent messages
-function isFeedAtBottom() {
-    return (this.chatBox.offsetHeight+this.chatBox.scrollTop)===this.chatBox.scrollHeight;
+//populate a dropdown menu with all online friends when the dropdown menu is clicked on
+async function get_online_friends() {
+	
+	
+	let d = new Date();
+    let currTime = parseInt(d.getTime() / 1000);
+    $.post('/getfriends', function (results) {
+        let promises = [];
+        if (results.Items) {
+            for (result of results.Items) {
+                promises.push(
+                    $.post(`/lastonline/${result.friend.S}`).then(
+                        (queryResults) => {
+							console.log(queryResults);
+                            if (queryResults.Item.last_online) {
+                                let diff = parseInt(
+                                    (currTime -
+                                        parseInt(
+                                            queryResults.Item.last_online.N
+                                        )) /
+                                        60
+                                );
+								console.log(diff);
+                                if (diff < 5) {
+                                    // Users with actions within 5 minutes are considered online
+									//each of these users should be added to the dropdown menu
+									let tomato = document.createElement("a");
+									tomato.setAttribute("href", "#");
+									tomato.setAttribute("class", "dropdown-item");
+									tomato.setAttribute("style", "color: green");
+									tomato.setAttribute("onclick", "addUser("+"'"+queryResults.user + "'); return false;")
+									tomato.innerHTML = queryResults.user;
+									console.log("returning a tomato");
+									console.log(tomato);
+									return tomato;
+
+                                } else {
+									return null;
+}
+                            }
+                        }
+                    )
+                );
+            }
+        } else {
+            content += '<p>None</p>';
+        }
+        Promise.all(promises).then((online_friends) => {
+            let available_friends = document.getElementById("online-friends-dropdown");
+            for (friend of online_friends) {
+				if(friend) {
+                	available_friends.append(friend);
+				}
+            }
+        });
+    });
+
+
 };
 
-function scrollFeedToBottom() {
-    this.chatBox.scrollTop = this.chatBox.scrollHeight;
+
+/*
+Emits message to the server inviting a user with username to join chat with chatid. Server will then broadcast the message to the user
+*/
+async function addUser(user_to_invite) {
+	console.log(document.getElementById('title'));
+	socket.emit('invite-user-to-chat', {
+		user_invited: user_to_invite,
+		chatid: chatid,
+		user_inviting: username,
+		chat_title: document.getElementById("title").innerText
+		});
 };
+
+
 

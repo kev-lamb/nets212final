@@ -552,6 +552,37 @@ var send_message = function (chatid, message, user, callback) {
         if (err) {
             callback(err);
         } else {
+			//before returning, update the config with the message data as well
+			parames = {
+            TableName: 'chats',
+            Key: {
+                chatID: {
+                    S: chatid,
+                },
+				sortkey: {
+					S: 'config',
+				}
+            },
+            UpdateExpression:
+                'set ' +
+                'message = :msg, ' +
+                'username = :usr, ' +
+                'lastTime = :lst',
+            ExpressionAttributeValues: {
+                ':msg': { S: message },
+                ':usr': { S: user },
+                ':lst': { S: timestamp },
+            },
+            ReturnValues: 'UPDATED_NEW',
+        	};
+			db.updateItem(parames, function(err,data) {
+				if(err) {
+					console.log("wasnt able to update config");
+					console.log(err);
+				} else {
+					console.log("updated config as requested");
+				}
+			});
             callback(null, 'Success');
         }
     });
@@ -1069,6 +1100,91 @@ var get_friends_visualizer = function (username, nodeid, callback) {
     });
 };
 
+//gets all members of the specified chat
+var get_chat_members = function(chatid, callback) {
+	params = {
+        TableName: 'chats',
+        KeyConditionExpression: 'chatID = :chatid and begins_with(sortkey, :mbr)',
+        ExpressionAttributeValues: {
+            ':chatid': { S: chatid },
+            ':mbr': { S: 'member_' },
+        },
+    };
+
+	db.query(params, function (err, data) {
+        callback(err, data);
+    });
+};
+
+var add_to_chat = function(username, chatid, callback) {
+	//get the timestamp
+    var today = new Date();
+	//we must add 0s in front of months and days that are single digits so order is maintained
+	//in the database properly (13 would be placed ahead of 6 otherwise for example)
+	var month = today.getMonth() + 1;
+	if(month < 10) {month = '0'+month;}
+	var day = today.getDate();
+	if(day < 10) {day = '0'+day;}
+	
+	//putting all the time data together to create the timestamp and sortkey
+    var timestamp =
+        today.getFullYear() +
+        '-' +
+        month +
+        '-' +
+        day +
+        '-' +
+        today.getHours() +
+        ':' +
+        today.getMinutes() +
+        ':' +
+        today.getSeconds();
+	
+	let params = {
+                    Item: {
+                        chatID: {
+                            S: chatid,
+                        },
+                        sortkey: {
+                            S: 'member_' + username,
+                        },
+                        createdAt: {
+                            S: timestamp,
+                        },
+                    },
+                    TableName: 'chats',
+                    ReturnValues: 'NONE',
+                };
+                db.putItem(params, function (err, data) {
+                    if (err) {
+                        console.log(err);
+						callback(err, null);
+                    } else {
+						callback(err, "success");
+					}
+                });
+};
+
+var remove_from_chat = function (username, chatid, callback) {
+
+
+	let params = {
+        TableName: 'chats',
+        Key: {
+            chatID: { S: chatid },
+            sortkey: { S: 'member_'+username },
+        },
+    };
+	db.deleteItem(params, function(err, data) {
+		if(err) {
+			console.log(err)
+			callback(err, null);
+		} else {
+			callback(err, "success");
+		}
+	});
+};
+
 /*var myDB_search_all = function (searchTerm, callback) {
     let params = {
         TableName: 'users',
@@ -1115,6 +1231,9 @@ var database = {
     get_posts_to_wall: get_posts_to_wall,
     create_chat: create_chat,
     get_title: get_title,
+	get_chat_members: get_chat_members,
+	add_to_chat: add_to_chat,
+	remove_from_chat: remove_from_chat,
 };
 
 module.exports = database;
