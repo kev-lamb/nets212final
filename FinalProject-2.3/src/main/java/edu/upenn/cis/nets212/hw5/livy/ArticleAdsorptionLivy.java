@@ -34,11 +34,11 @@ public class ArticleAdsorptionLivy {
 		  System.out.printf("Running SocialRankJob with %s as its input...\n", sourceFile);
 		  
 		  List<MyPair<Integer,Double>> resultBackLinks = client.submit
-				  (new SocialRankJob(true, sourceFile)).get();
+				  (new ArticleAdsorptionJob(true, sourceFile)).get();
 		  System.out.println("With backlinks: " + resultBackLinks);
 		  
 		  List<MyPair<Integer,Double>> resultNoBackLinks = client.submit
-				  (new SocialRankJob(false, sourceFile)).get();
+				  (new ArticleAdsorptionJob(false, sourceFile)).get();
 		  System.out.println("Without backlinks: " + resultNoBackLinks);
 
 		} finally {

@@ -1,8 +1,5 @@
 package edu.upenn.cis.nets212.hw5;
 
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
@@ -14,9 +11,7 @@ import com.amazonaws.services.dynamodbv2.model.KeyType;
 import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
 import com.amazonaws.services.dynamodbv2.model.ResourceInUseException;
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
-import com.amazonaws.services.dynamodbv2.model.ScanRequest;
 import com.amazonaws.services.dynamodbv2.document.Table;
-import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.spec.ScanSpec;
 
 import com.google.gson.*;
@@ -35,19 +30,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.apache.commons.math3.distribution.EnumeratedDistribution;
 import org.apache.commons.math3.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
-
-import org.json4s.jackson.*;
 
 import edu.upenn.cis.nets212.config.Config;
 import edu.upenn.cis.nets212.storage.DynamoConnector;
@@ -84,8 +77,24 @@ public class ArticleAdsorption {
 	Table recommended;
 	
 	// A static graph that will be constructed from the static News DynamoDB table.
+	// This graph is NOT filtered by any date: all possible edges are present.
 	JavaPairRDD<Tuple2<Node, Node>, Double> articleCategoryGraph; 
 	
+	/**
+	 * Dear outside user,
+	 * 
+	 * 1) Create an instance of ArticleAdsorption.
+	 * 
+	 * 2) Call initialize().
+	 * 
+	 * 3) Repeatedly call run(double dMax, int iMax, boolean debug, String inputUser, String date)
+	 *    for as many times as you need to recommend an article to a user.
+	 *    (run() will return a String of the URL link of the recommended article.)
+	 *    (Per the instructions, set iMax = 15 iterations.)
+	 *    
+	 * 4) Finally, when done operating your server, call shutdown().
+	 * 
+	 */
 	public ArticleAdsorption() {
 		System.setProperty("file.encoding", "UTF-8");
 	}
@@ -118,7 +127,8 @@ public class ArticleAdsorption {
 					Arrays.asList(new KeySchemaElement("UserID", KeyType.HASH), 
 							new KeySchemaElement("link", KeyType.RANGE)), 																			         
 					Arrays.asList(new AttributeDefinition("UserID", ScalarAttributeType.S),
-							new AttributeDefinition("link", ScalarAttributeType.S)),
+							new AttributeDefinition("link", ScalarAttributeType.S), 
+							new AttributeDefinition("date", ScalarAttributeType.S)),
 					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
 
 			likes.waitForActive();
@@ -128,10 +138,11 @@ public class ArticleAdsorption {
 		
 		try {
 			recommended = db.createTable("Recommended", 
-					Arrays.asList(new KeySchemaElement("User_ID", KeyType.HASH), 
+					Arrays.asList(new KeySchemaElement("UserID", KeyType.HASH), 
 							new KeySchemaElement("link", KeyType.RANGE)), 																			         
-					Arrays.asList(new AttributeDefinition("User_ID", ScalarAttributeType.S),
-							new AttributeDefinition("link", ScalarAttributeType.S)),
+					Arrays.asList(new AttributeDefinition("UserID", ScalarAttributeType.S),
+							new AttributeDefinition("link", ScalarAttributeType.S), 
+							new AttributeDefinition("date", ScalarAttributeType.S)),
 					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
 			recommended.waitForActive();
 		} catch (final ResourceInUseException exists) {
@@ -161,13 +172,18 @@ public class ArticleAdsorption {
 		
 		users = db.getTable("Users");
 		friends = db.getTable("Friends");
-		initializeTables(); // Assigns references to the news, likes, and recommended Table fields. 	
+		initializeTables(); // Assigns references to the news, likes, and recommended Table fields. 
+		
+		// Perform the single read of the news feed JSON data, 
+		// assigning a value to the articleCategoryGraph field.
+		getAllArticleCategoryData(Config.NEWS_FEED_PATH); 
 	}
 	
 	/**
-	 * ****This method should not be called more than once.****
+	 * ***This method should not be called more than once.****
+	 * ***It is called automatically within initialize().***
 	 * 
-	 * Populate the News DynamoDB table, and create the static articleCategoryGraph 
+	 * Populates the News DynamoDB table, and creates the static articleCategoryGraph 
 	 * from the static News DynamoDB table, in accordance with the following guidelines:
 	 * 
 	 * - category nodes for every news article category
@@ -179,7 +195,7 @@ public class ArticleAdsorption {
 	 * 
 	 * Sets the "articleCategoryGraph" field equal to a JavaPairRDD <Tuple2<from_node, to_node>, edge_weight>
 	 * graph of the News table, consisting of (a, c) and (c, a) nodes. The edge weights will be
-	 * initialized properly in accordance with the guidelines in getNewsFeedNetwork().
+	 * initialized properly in accordance with the guidelines.
 	 * @throws IOException
 	 */
 	void getAllArticleCategoryData(String filePath) throws IOException {
@@ -281,25 +297,67 @@ public class ArticleAdsorption {
 		// Convert listEdgeWithWeight to a PairRDD.
 		JavaPairRDD<Tuple2<Node, Node>, Double> articleCategoryGraph = context.parallelizePairs(listEdgeWithWeight);
 		
-		// TODO: Properly initialize the edge weights (in accordance with the guidelines).
-		// (I.e., no more placeholder "1.0" edge weights.)
+		/* 
+		 * Properly initialize the edge weights (in accordance with the guidelines).
+		 * (I.e., no more placeholder "1.0" edge weights.)
+		 */
 		
-		this.articleCategoryGraph = articleCategoryGraph;
+		// 1a) Select the edges <<from_node, to_node>, weight> where from_node.type = "article".
+		// (Which, in this case, also guarantees that to_node.type = "category".)
+		JavaPairRDD<Tuple2<Node, Node>, Double> fromArticle = articleCategoryGraph
+				.filter(entry -> entry._1()._1().type.equals("article"));
+		
+		// 1b) Select the edges <<from_node, to_node>, weight> where from_node.type = "category".
+		// (Which, in this case, also guarantees that to_node.type = "article".)
+	    JavaPairRDD<Tuple2<Node, Node>, Double> fromCategory = articleCategoryGraph
+	    		.filter(entry -> entry._1()._1().type.equals("category"));
+	    
+	    // 2) Express the PairRDD's more conveniently as PairRDD<from_node, <to_node, weight>>.
+	    // (To prepare to aggregateByKey() on the from_node.)
+	    JavaPairRDD<Node, Tuple2<Node, Double>> fromArticleBetter = fromArticle.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    JavaPairRDD<Node, Tuple2<Node, Double>> fromCategoryBetter = fromCategory.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    // 3) Calculate the out-degree of each from_node in each separate PairRDD.
+	    JavaPairRDD<Node, Integer> articleOutDeg = fromArticleBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    JavaPairRDD<Node, Integer> categoryOutDeg = fromCategoryBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    // 4) Join, on from_node, the out-degree PairRDD's with their respective "better" PairRRD's.
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> articleJoin = fromArticleBetter.join(articleOutDeg);
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> categoryJoin = fromCategoryBetter.join(categoryOutDeg);
+		
+	    // 5a) Scale each <<article, category>, weight>'s edge weight by (0.5 / articleOutDeg). 
+	    JavaPairRDD<Node, Tuple2<Node, Double>> fromArticleProperEdges = articleJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.5 / entry._2._2))));
+	    
+	    // 5b) Scale each <<category, article>, weight>'s edge weight by (0.5 / categoryOutDeg).   
+	    JavaPairRDD<Node, Tuple2<Node, Double>> fromCategoryProperEdges = categoryJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.5 / entry._2._2))));
+	    
+	    // 6) Convert the PairRDD's back to the original format of <<from_node, to_node>, weight>.
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalFromArticle = fromArticleProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalFromCategory = fromCategoryProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    // 7) Union the PairRDD's to create the output PairRDD.
+		this.articleCategoryGraph = finalFromArticle.union(finalFromCategory);
 	}
 	
 	/**
-	 * Fetch the news feed data from the S3 path, and the user/article data from the DynamoDB tables,
-	 * and create a directed edge list PairRDD with:
-	 * - article nodes for articles published on the input <date> or earlier
-	 * - category nodes for every news article category
-	 * - article nodes connected to their corresponding category nodes (and vice versa)
-	 * - for every category node c: all (c,a) edges have equal weights which sum to 0.5. 
-	 * - for every article node a: all (a,c) edges have equal weights which sum to 0.5.
-	 *  
-	 * ^^^getAllArticleCategoryData() performs all the above EXCEPT the filtering by date.^^^
-	 * ** This method will perform the filtering by date. ** 
-	 * 
-	 * Additionally:
+	 * Fetches the user/article data from the DynamoDB tables, and create a directed edge list PairRDD following:	  
 	 * - user nodes for each user 
 	 * - user nodes connected to their friends (and vice versa)
 	 * - user nodes connected to the category nodes that they are interested in (vice versa)
@@ -308,70 +366,73 @@ public class ArticleAdsorption {
 	 *     - all (u,u') edges have equal weights which sum to 0.3. 
 	 *     - all (u,c) edges have equal weights which sum to 0.3.
 	 *     - all (u,a) edges have equal weights which sum to 0.4.
+	 *     
+	 * - for every category node c: all (c,u) edges have equal weights which sum to 0.5. 
+	 * - for every article node a: all (a,u) edges have equal weights which sum to 0.5.
+	 * 
+	 * Unions this graph with the output graph of getAllArticleCategoryData() into a single
+	 * PairRDD graph, and outputs the resulting PairRDD graph,
+	 * which will be ready for processing by the adsorption algorithm.
+	 * 
+	 * **All article nodes in the resulting graph will be filtered by <date>.**
+	 * (Only articles published on or before the input <date> will appear as nodes.) 
 	 * 
 	 * (The input <date> should be provided in "YYYY-MM-DD" format. Additionally, four years should 
 	 * be added to each article's publish date when interpreting it.) 
 	 * 
 	 * @param filePath
-	 * @param date
-	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight>
+	 * @param date Filters out the articles published after this date.(Provided in "YYYY-MM-DD" format.)
+	 * @return JavaPairRDD: <Tuple2<from_node, to_node>, edge_weight> A culminated graph for the entire network.
+	 * @throws IOException, DynamoDbException
 	 */
-	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String filePath, String date) {
-		// TODO: Complete this method. (Invoke getAllArticleCategoryData(), Query the user-related tables.)
-		
-		
-		// *Ensure that each Node initially has a LabelMap mapping each user to 0.0.* 
-		// (both postIter and midIter), *unless* the node is a user node, where then
-		// postIterLabelMap should map the user's username to 1.0.
-		
-		// Additionally, set the publishDate and link fields for any article node created.
-		
+	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String date) throws IOException, DynamoDbException {
+
 		// Lists to be accumulated and soon converted to multiple PairRDD<Tuple2<Node, Node>, Double>'s
 		// through context.parallelizePairs() calls.
 		List<Tuple2<Tuple2<Node, Node>, Double>> userUserWeightList = new ArrayList<>();
 		List<Tuple2<Tuple2<Node, Node>, Double>> userCategoryWeightList = new ArrayList<>();
 		List<Tuple2<Tuple2<Node, Node>, Double>> userArticleWeightList = new ArrayList<>();
-	    
-		// TODO: Are these proper scans??
 		
 		// Scan the Friends table to create (u, u') edges.
-		ItemCollection<ScanOutcome> friendsResults = friends.scan(new ScanSpec());
+		ItemCollection<ScanOutcome> friendsResults = friends.scan(new ScanSpec()
+				.withProjectionExpression("User, Friend"));
 		Iterator<Item> itemIter = friendsResults.iterator();
-		
-		 while (itemIter.hasNext()) {
-             Item item = itemIter.next();
-             String userOneName = item.getString("User");
-             String userTwoName = item.getString("Friend");
-             
-             Node userOneNode = new Node(userOneName, "user");
-             Node userTwoNode = new Node(userTwoName, "user");
-             
-            // Edge weights initially given 1.0 as a placeholder. 
- 			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
+			
+		while (itemIter.hasNext()) {
+		    Item item = itemIter.next();
+		    String userOneName = item.getString("User");
+		    String userTwoName = item.getString("Friend");
+		     
+		    Node userOneNode = new Node(userOneName, "user");
+		    Node userTwoNode = new Node(userTwoName, "user");
+		     
+		    // Edge weights initially given 1.0 as a placeholder. 
+			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
 				(new Tuple2<Node, Node>(userOneNode, userTwoNode), 1.0);
 			
-			Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
-			(new Tuple2<Node, Node>(userTwoNode, userOneNode), 1.0);
+		    Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
+		    	(new Tuple2<Node, Node>(userTwoNode, userOneNode), 1.0);
 			
-			userUserWeightList.add(directionOne);
-			userUserWeightList.add(directionTwo);
-         }
+		    userUserWeightList.add(directionOne);
+		    userUserWeightList.add(directionTwo);
+		}
 		
 		// Scan the Users table to create (u, c) and (c, u) edges.
-		ItemCollection<ScanOutcome> usersResults = users.scan(new ScanSpec());
+		ItemCollection<ScanOutcome> usersResults = users.scan(new ScanSpec()
+				.withProjectionExpression("Login name, List of Interests"));
 		itemIter = usersResults.iterator();
 		
-		 while (itemIter.hasNext()) {
-             Item item = itemIter.next();
-             String username = item.getString("User");
-             Node userNode = new Node(username, "user");
+		while (itemIter.hasNext()) {
+            Item item = itemIter.next();
+            String username = item.getString("Login name");
+            Node userNode = new Node(username, "user");
              
-             List<String> interestList = item.getList("List of Interests");
+            List<String> interestList = item.getList("List of Interests");
              
-             Iterator<String> interestListIter = interestList.iterator();
-             while (interestListIter.hasNext()) {
-            	 String categoryName = interestListIter.next();
-            	 Node categoryNode = new Node(categoryName, "category");
+            Iterator<String> interestListIter = interestList.iterator();
+            while (interestListIter.hasNext()) {
+            	String categoryName = interestListIter.next();
+            	Node categoryNode = new Node(categoryName, "category");
             	
             	// Edge weights initially given 1.0 as a placeholder. 
       			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
@@ -382,43 +443,182 @@ public class ArticleAdsorption {
      			
      			userCategoryWeightList.add(directionOne);
      			userCategoryWeightList.add(directionTwo);
-             }
-         }
+            }
+        }
 		
 		// Scan the Likes table to create (u, a) and (a, u) edges.
-		ItemCollection<ScanOutcome> likesResults = likes.scan(new ScanSpec());
+		ItemCollection<ScanOutcome> likesResults = likes.scan(new ScanSpec()
+				.withProjectionExpression("UserID, link, date"));
 		itemIter = likesResults.iterator();
 		
-		 while (itemIter.hasNext()) {
-             Item item = itemIter.next();
-             String username = item.getString("User");
-             String link = item.getString("link");
+		while (itemIter.hasNext()) {
+            Item item = itemIter.next();
+            String username = item.getString("UserID");
+            String link = item.getString("link");
+            String publishDate = item.getString("date");
              
-             Node userNode = new Node(username, "user");
-             Node articleNode = new Node(link, "article");
+            Node userNode = new Node(username, "user");
+            Node articleNode = new Node(link, "article");
+            articleNode.publishDate = publishDate;
              
          	// Edge weights initially given 1.0 as a placeholder. 
    			Tuple2<Tuple2<Node, Node>, Double> directionOne = new Tuple2<Tuple2<Node, Node>, Double>
-  				(new Tuple2<Node, Node>(userNode, articleNode), 1.0);
+   				(new Tuple2<Node, Node>(userNode, articleNode), 1.0);
   			
   			Tuple2<Tuple2<Node, Node>, Double> directionTwo = new Tuple2<Tuple2<Node, Node>, Double>
-  			(new Tuple2<Node, Node>(articleNode, userNode), 1.0); 
+  				(new Tuple2<Node, Node>(articleNode, userNode), 1.0); 
   			
   			userArticleWeightList.add(directionOne);
   			userArticleWeightList.add(directionTwo);
-         }
+        }
 		
-		 JavaPairRDD<Tuple2<Node, Node>, Double> userUserGraph = context.parallelizePairs(userUserWeightList);
-		 JavaPairRDD<Tuple2<Node, Node>, Double> userCategoryGraph = context.parallelizePairs(userCategoryWeightList);
-		 JavaPairRDD<Tuple2<Node, Node>, Double> userArticleGraph = context.parallelizePairs(userArticleWeightList);
+		JavaPairRDD<Tuple2<Node, Node>, Double> userUserGraph = context.parallelizePairs(userUserWeightList);
+		JavaPairRDD<Tuple2<Node, Node>, Double> userCategoryGraph = context.parallelizePairs(userCategoryWeightList);
+		JavaPairRDD<Tuple2<Node, Node>, Double> userArticleGraph = context.parallelizePairs(userArticleWeightList);
 		
-		// TODO: Properly initialize the edge weights (in accordance with the guidelines).
-		// (I.e., no more placeholder "1.0" edge weights.)
+		/*
+		 * Filter the articleCategoryGraph and the userArticleGraph by <date>.
+		 * If an article has a publish date after <date>, its associated edge should be removed.
+		 * 
+		 * (Add four years to any article publish date when interpreting it.)
+		 */
 		
+		JavaPairRDD<Tuple2<Node, Node>, Double> articleCategoryFiltered = articleCategoryGraph.filter
+				(entry -> (new FilterOutAfterDate(date)).call(entry));
 		
-		 // union call at the very end with everything and the articleCategoryGraph field.
+		JavaPairRDD<Tuple2<Node, Node>, Double> userArticleFiltered = userArticleGraph.filter
+				(entry -> (new FilterOutAfterDate(date)).call(entry));
 		
-		return null;
+		/* 
+		 * Properly initialize the edge weights (in accordance with the guidelines).
+		 * (I.e., no more placeholder "1.0" edge weights.)
+		 */
+		
+		// 1a) Select the edges <<from_node, to_node>, weight>
+		// where from_node.type = "user", to_node.type = "user".
+		JavaPairRDD<Tuple2<Node, Node>, Double> userToUser = userUserGraph; // Given.
+																		    // Just hand it a nicer name.
+		
+		// 1b) Select the edges <<from_node, to_node>, weight>
+		// where from_node.type = "user", to_node.type = "category".
+		JavaPairRDD<Tuple2<Node, Node>, Double> userToCategory = userCategoryGraph
+				.filter(entry -> entry._1()._1().type.equals("user"));
+		
+		// 1c) Select the edges <<from_node, to_node>, weight>
+		// where from_node.type = "category", to_node.type = "user".
+		JavaPairRDD<Tuple2<Node, Node>, Double> categoryToUser = userCategoryGraph
+				.filter(entry -> entry._1()._1().type.equals("category"));
+		
+		// 1d) Select the edges <<from_node, to_node>, weight>
+		// where from_node.type = "user", to_node.type = "article".
+		JavaPairRDD<Tuple2<Node, Node>, Double> userToArticle = userArticleFiltered
+				.filter(entry -> entry._1()._1().type.equals("user"));
+		
+		// 1e) Select the edges <<from_node, to_node>, weight>
+		// where from_node.type = "article", to_node.type = "user".
+		JavaPairRDD<Tuple2<Node, Node>, Double> articleToUser = userArticleFiltered
+				.filter(entry -> entry._1()._1().type.equals("article"));
+		
+	    // 2) Express the PairRDD's more conveniently as PairRDD<from_node, <to_node, weight>>.
+	    // (To prepare to aggregateByKey() on the from_node.)
+	    JavaPairRDD<Node, Tuple2<Node, Double>> userToUserBetter = userToUser.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    JavaPairRDD<Node, Tuple2<Node, Double>> userToCategoryBetter = userToCategory.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    JavaPairRDD<Node, Tuple2<Node, Double>> categoryToUserBetter = categoryToUser.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    JavaPairRDD<Node, Tuple2<Node, Double>> userToArticleBetter = userToArticle.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    JavaPairRDD<Node, Tuple2<Node, Double>> articleToUserBetter = articleToUser.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1._1, new Tuple2<Node, Double>(entry._1._2, entry._2)));
+	    
+	    // 3) Calculate the out-degree of each from_node in each separate PairRDD.
+	    JavaPairRDD<Node, Integer> userOutDegToUser = userToUserBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    JavaPairRDD<Node, Integer> userOutDegToCategory = userToCategoryBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    JavaPairRDD<Node, Integer> categoryOutDegToUser = categoryToUserBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    JavaPairRDD<Node, Integer> userOutDegToArticle = userToArticleBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    JavaPairRDD<Node, Integer> articleOutDegToUser = articleToUserBetter
+	    		.aggregateByKey(0, (val, row) -> val + 1, (val1, val2) -> val1 + val2);
+	    
+	    // 4) Join, on from_node, the out-degree PairRDD's with their respective "better" PairRRD's.
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> userToUserJoin = userToUserBetter.join(userOutDegToUser);
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> userToCategoryJoin = userToCategoryBetter.join(userOutDegToCategory);
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> categoryToUserJoin = categoryToUserBetter.join(categoryOutDegToUser);
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> userToArticleJoin = userToArticleBetter.join(userOutDegToArticle);
+	    JavaPairRDD<Node, Tuple2<Tuple2<Node, Double>, Integer>> articleToUserJoin = articleToUserBetter.join(articleOutDegToUser);
+		
+	    // 5a) Scale each <<user, user>, weight>'s edge weight by (0.3 / userOutDegToUser). 
+	    JavaPairRDD<Node, Tuple2<Node, Double>> userToUserProperEdges = userToUserJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.3 / entry._2._2))));
+	    
+	    // 5b) Scale each <<user, category>, weight>'s edge weight by (0.3 / userOutDegToCategory). 
+	    JavaPairRDD<Node, Tuple2<Node, Double>> userToCategoryProperEdges = userToCategoryJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.3 / entry._2._2))));
+	    
+	    // 5c) Scale each <<category, user>, weight>'s edge weight by (0.5 / categoryOutDegToUser). 
+	    JavaPairRDD<Node, Tuple2<Node, Double>> categoryToUserProperEdges = categoryToUserJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.5 / entry._2._2))));
+	    
+	    // 5d) Scale each <<user, article>, weight>'s edge weight by (0.4 / userOutDegToArticle). 
+	    JavaPairRDD<Node, Tuple2<Node, Double>> userToArticleProperEdges = userToArticleJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.4 / entry._2._2))));
+	    
+	    // 5e) Scale each <<article, user>, weight>'s edge weight by (0.5 / articleOutDegToUser). 
+	    JavaPairRDD<Node, Tuple2<Node, Double>> articleToUserProperEdges = articleToUserJoin.mapToPair
+	    		(entry -> new Tuple2<Node, Tuple2<Node, Double>>
+	    		(entry._1, new Tuple2<Node, Double>(entry._2._1._1, entry._2._1._2 * (0.5 / entry._2._2))));
+	    
+	    // 6) Convert the PairRDD's back to the original format of <<from_node, to_node>, weight>.
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalUserToUser = userToUserProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalUserToCategory = userToCategoryProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalCategoryToUser = categoryToUserProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalUserToArticle = userToArticleProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    JavaPairRDD<Tuple2<Node, Node>, Double> finalArticleToUser = articleToUserProperEdges.mapToPair
+	    		(entry -> new Tuple2<Tuple2<Node, Node>, Double>
+	    		(new Tuple2<Node, Node>(entry._1, entry._2._1), entry._2._2));
+	    
+	    // 7) Union the PairRDD's to create the overallNetwork PairRDD to be output.
+	    JavaPairRDD<Tuple2<Node, Node>, Double> overallNetwork = articleCategoryFiltered
+	    		.union(finalUserToUser)
+	    		.union(finalUserToCategory)
+	    		.union(finalCategoryToUser)
+	    		.union(finalUserToArticle)
+	    		.union(finalArticleToUser);
+	    
+		return overallNetwork;
 	}
 
 	/**
@@ -426,24 +626,27 @@ public class ArticleAdsorption {
 	 * 
 	 * @param dMax If the maximum change in the user score, considering any 
 	 *             LabelMap, falls at or below this value, the algorithm will terminate. 
+	 *             
 	 * @param iMax The maximum number of absorption iterations allowed to run before
-	 *             the algorithm terminates. 
-	 * @param debug If true, outputs the user score of each node after each iteration. 
+	 *             the algorithm terminates. ***Should use 15.***
+	 *             
+	 * @param debug If true, outputs the inputUser score of each node after each iteration. 
+	 * 
 	 * @param inputUser The user score of particular interest for the algorithm (i.e., the user 
-	 *             whose news feed will be updated through the use of this algorithm). 
-	 * @param date The date of the articles that will be considered when creating the
-	 *             user's updated news feed, provided in "YYYY-MM-DD" format.
-	 * @return The recommended article Node for the <inputUser>.
+	 *             whose news feed will be updated after this algorithm ceases). 
+	 *             
+	 * @param date The date of the articles that will be considered when choosing an
+	 *             article for the user. (Provided in "YYYY-MM-DD" format.)
+	 *             
+	 * @return The recommended article Node's link, for the <inputUser>.
 	 * @throws IOException File read, network, and other errors
 	 * @throws InterruptedException User presses Ctrl-C
 	 */
-	public Node run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
+	public String run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
 		logger.info("Running");
 
 		// Load the network.
-		JavaPairRDD<Tuple2<Node, Node>, Double> network = getNewsFeedNetwork(Config.NEWS_FEED_PATH, date);
-		
-		// .filter() to clear out edges with bad-dated articles??
+		JavaPairRDD<Tuple2<Node, Node>, Double> network = getNewsFeedNetwork(date);
 		
 		/*
 		 * Conduct the adsorption algorithm on the network.
@@ -521,12 +724,14 @@ public class ArticleAdsorption {
 				node.finalizeLabelMap();
 			});
 			
-			// TODO: Have a debug mode with printed information every iteration? (Optional)
 			/*
+			 * ?? Have a debug mode with printed information every iteration ?? (Optional)
+			 */
+			
 			if (debug) {
 			
 			}
-			*/
+			
 			
 			/*
 			 * Test for convergence by comparing nonSourceNodes and updatedNonSourceNodes.
@@ -609,7 +814,8 @@ public class ArticleAdsorption {
 		}
 		
 		/*
-		 * TODO: Take the resulting updatedNonSourceNodes and compile the nodes that are type = "article" 
+		 * ADSORPTION ALGORITHM CONCLUSION:
+		 * Take the resulting updatedNonSourceNodes and compile the nodes that are type = "article" 
 		 * with publishDate = <date>, disregarding the articles that were already recommended to the 
 		 * <inputUser>. Among the remaining articles, randomly select one, using probabilities equal 
 		 * to their scaled <inputUser> scores from each node's postIterLabelMap.
@@ -618,15 +824,34 @@ public class ArticleAdsorption {
 		JavaRDD<Node> todaysArticles = updatedNonSourceNodes
 				.filter(node -> node.type.equals("article") && node.publishDate.equals(date));
 		
-		// TODO: Filter out the articles that were already recommended to the <inputUser>.
-		// (Query the Recommended Table. Perhaps create another RDD<Node> and use subtract().)
-		JavaRDD<Node> validArticles = todaysArticles;
+		// *Filter out the articles that were already recommended to the <inputUser>.*
+		// 1) Accumulate a List<Node> of the query results. 
+		ItemCollection<QueryOutcome> queryResults = recommended.query("UserID", inputUser);
+		List<Node> queryResultNodes = new ArrayList<>(); // Will become a JavaRDD<Node>.
 		
-		// Extract the <inputUser> score from each article's postIterLabelMap.
+		for (Item item : queryResults) {
+			String articleLink = item.getString("link");
+			Node articleNode = new Node(articleLink, "article");
+			queryResultNodes.add(articleNode);
+		}
+		
+		// 2) context.parallelize() the List<Node> into a JavaRDD<Node> and invoke subtract().
+		JavaRDD<Node> queryResultRDD = context.parallelize(queryResultNodes);
+		JavaRDD<Node> validArticles = todaysArticles.subtract(queryResultRDD);
+		
+		// *Extract the <inputUser> score from each article's postIterLabelMap.*
+		
+		// 1) Some article nodes may have a null mapping for the inputUser. 
+		//    (They were never "told" about them.)
+		//    This should be equivalent to a mapping to the value 0.0.
+		validArticles.foreach(node -> node.postIterLabelMap.putIfAbsent(inputUser, 0.0));
+		
+		// 2) Now proceed as intended.
 		JavaPairRDD<Node, Double> articleAndUserScore = validArticles
 				.mapToPair(node -> new Tuple2<Node, Double>(node, node.postIterLabelMap.get(inputUser)));
 		
-		// Scale the <inputUser> scores such that they sum to 1.
+		// *Scale the <inputUser> scores such that they sum to 1.*
+		
 		// 1) First obtain the sum of all <inputUser> scores across the nodes.
 		JavaRDD<Double> userScores = articleAndUserScore.map(pair -> pair._2);
 		
@@ -636,7 +861,8 @@ public class ArticleAdsorption {
 		JavaPairRDD<Node, Double> articleAndScaledScore = articleAndUserScore
 				.mapToPair(entry -> new Tuple2<Node, Double>(entry._1, entry._2 / scoreSum));
 		
-		// Randomly select and output an article using the scaled <inputUser> scores as weights.
+		// *Randomly select and output an article using the scaled <inputUser> scores as weights.*
+		
 		// 1) Represent the PairRDD<Node, Double> as a list of Pair<Node, Double> objects.
 		// (Required by the eventually-invoked EnumeratedDistribution object.)
 		JavaRDD<Pair<Node, Double>> asPairs = articleAndScaledScore
@@ -647,11 +873,26 @@ public class ArticleAdsorption {
 		// 2) Complete the weighted selection using an EnumeratedDistribution object.
 		Node selectedNode = new EnumeratedDistribution<Node>(asPairList).sample();
 		
-		// TODO: Upload the link of selectedNode to the Recommended Table.
+		String selectedLink = null;
+		
+		if (selectedNode != null) {
+			// Nodes with type = "article" have links as their name field.
+			selectedLink = selectedNode.name;
+			
+			// Upload the recommendation information to the Recommended Table.
+			// (Future invocations of the adsorption algorithm on this <inputUser> will
+			// now avoid re-recommending this article.) 
+			
+			Item item = new Item();
+			item.withPrimaryKey("UserID", inputUser, "link", selectedLink);
+			item.withString("date", date);
+			
+			recommended.putItem(item);	
+		}
 			
 		logger.info("*** Finished adsorption algorithm! ***");
 		
-		return selectedNode;
+		return selectedLink;
 	}
 
 
@@ -667,11 +908,69 @@ public class ArticleAdsorption {
 		DynamoConnector.shutdown();
 	}
 	
+	// Private class whose call() method is invoked by a filter() in getNewsFeedNetwork() 
+	// when filtering out article nodes (and their corresponding edges) with publish dates
+	// after an input <date>.
+	private class FilterOutAfterDate implements Function<Tuple2<Tuple2<Node, Node>, Double>, Boolean> {
+		
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+		
+		LocalDate currDateObj; // A LocalDate object created from the input <date> in the class constructor.
+		
+		// <date> provided in "YYYY-MM-DD" format. We will filter out the articles published after this date.
+		FilterOutAfterDate(String date) {
+			currDateObj = LocalDate.parse(date);
+		}
+		
+		public Boolean call(Tuple2<Tuple2<Node, Node>, Double> entry) {
+			Node fromNode = entry._1._1;
+			Node toNode = entry._1._2;
+			
+			// Test the fromNode.
+			if (fromNode.type.equals("article")) {
+				String publishDate = fromNode.publishDate;
+				
+				// We add four years to the publish date of an article when interpreting it
+				// (per the instructions). 
+				LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+				
+				if (nodeDateObj.isAfter(currDateObj)) {
+					return false;
+				}
+				
+			}
+			
+			// Test the toNode.
+			if (toNode.type.equals("article")) {
+				String publishDate = toNode.publishDate;
+				
+				// We add four years to the publish date of an article when interpreting it
+				// (per the instructions). 
+				LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+				
+				if (nodeDateObj.isAfter(currDateObj)) {
+					return false;
+				}
+			}
+			
+			// All clear!
+			return true;
+		}
+	}
+	
 	// Private class whose call() method is invoked in the aggregateByKey() method 
 	// that coalesces the nodes in updatedNonSourceNodes. Serves as the seq or comb function.
 	// (See JavaDocs for clarification.)
 	private class coalesceSeqOrCombFunc implements Function2<Map<String, Double>, Map<String, Double>, Map<String, Double>> {
 		
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
 		// Sum the two maps, value-by-value, into a new map.
 		public Map<String, Double> call(Map<String, Double> val, Map<String, Double> row) {
 			if (val.isEmpty()) {
