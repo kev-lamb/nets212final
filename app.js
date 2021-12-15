@@ -19,6 +19,7 @@ var io = require('socket.io')(http);
 
 io.on('connection', (socket) => {
     console.log('a user connected');
+	//send chats to all users in a particular chat when a messages is received server-side
     socket.on('send-chat-message', (data) => {
         console.log('server received a message');
         console.log(data.message);
@@ -28,6 +29,17 @@ io.on('connection', (socket) => {
             chatid: data.chatid,
         });
     });
+
+	//send chat invitation to a user when its received by the server
+	socket.on('invite-user-to-chat', (data) => {
+		socket.broadcast.emit('invite-user', {
+			user_invited: data.user_invited,
+			user_inviting: data.user_inviting,
+			chatid: data.chatid,
+			chat_title: data.chat_title
+		});
+	});
+
 });
 
 // home page is first page we see
@@ -63,6 +75,12 @@ app.get('/data/userprofile', routes.get_user_profile);
 //get messages from a chat
 app.get('/data/chat', routes.get_messages);
 
+//adds a user to a chat they were invited to
+app.post('/joinchat', routes.join_chat);
+
+//removes a user from a chat they wish to leave
+app.get('/leave/:chatid', routes.leave_chat);
+
 //post a message to the database
 app.post('/sendmessage', routes.send_message);
 
@@ -82,6 +100,9 @@ app.post('/createchat', routes.create_chat);
 
 // get the title of a chat with a given id
 app.get('/data/chat/titles/:chatid', routes.get_title);
+
+//get all users in a specific chat
+app.get('/data/users/:chatid', routes.get_chat_members);
 
 // get search page
 app.get('/search', routes.get_search_users);

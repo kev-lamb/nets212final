@@ -437,6 +437,51 @@ var get_title = function (req, res) {
     }
 };
 
+var get_chat_members = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		db.get_chat_members(req.params.chatid, function(err, data) {
+			res.send(data);
+		});
+	}
+};
+
+//adds a new user to the specified chat
+var join_chat = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		//make sure user isnt already in the chat
+		db.in_chat(req.session.username, req.body.chatid, function(err, data) {
+			if(data.Items.length == 0) {
+				//user wasnt in the chat already, so we need to add them to the table
+				db.add_to_chat(req.session.username, req.body.chatid, function(err, data) {
+					res.send(data);
+				});
+			} else {
+				res.send("not a null thing");
+			}
+		});
+	}
+};
+
+//removes user from chat specified in req.params
+var leave_chat = function (req, res) {
+	if(!req.session.username) {
+		res.redirect('/login?error=0');
+	} else {
+		if(!req.params.chatid) {
+			res.redirect("/");
+		} else {
+			//remove current user from this chat
+			db.remove_from_chat(req.session.username, req.params.chatid, function (err, data) {
+				res.redirect("/testchat");
+			});
+		}
+	}
+};
+
 var routes = {
     home_page: getHome,
     login_page: getLogin,
@@ -475,6 +520,9 @@ var routes = {
     create_chat: createChat,
     yourfriends: yourfriends,
     get_title: get_title,
+	get_chat_members: get_chat_members,
+	join_chat: join_chat,
+	leave_chat: leave_chat,
 };
 
 module.exports = routes;

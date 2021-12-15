@@ -2,10 +2,10 @@
 <html>
     <head>
         <title>Home</title>
-        <link
-            rel="stylesheet"
-            href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
-        />
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+		<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+		<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
         <style>
         	body {
         		color: blue;
@@ -54,35 +54,43 @@
 			}
 			
         </style>
-        <script
-            type="text/javascript"
-            src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
-        ></script>
         <script src="/socket.io/socket.io.js"> </script>
         <script src="chat.js"> </script>
+        
     </head>
     <body onload="populate_chat_onLoad('<%=chatid%>')">
-    	<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  			<a class="navbar-brand" href="/">PennBook</a>
-  			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
-    			<span class="navbar-toggler-icon"></span>
-  			</button>
-  			<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
-    			<div class="navbar-nav">
+    	<nav class="navbar navbar-expand-md navbar-light bg-light">
+        <a href="/" class="navbar-brand">PennBook</a>
+        <div id="navbarCollapse" class="collapse navbar-collapse">
+        	<div class="navbar-nav">
      				<a class="nav-item nav-link active" href="/account"><%= username %> <span class="sr-only">(current)</span></a>
       				<a class="nav-item nav-link" href="/testchat">Chats</a>
-      				<a class="nav-item nav-link" href="#">Placeholder item</a>
-      				<a class="nav-item nav-link disabled" href="#">Placeholder item</a>
+      				<a class="nav-item nav-link" style="color: red" href="/leave/<%=chatid%>">Leave Chat</a>
+      				
     			</div>
-  			</div>
-		</nav>
+            <ul class="nav navbar-nav">
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">Chat Members</a>
+                    <div class="dropdown-menu" id="members-dropdown">
+                    </div>
+                </li>
+            </ul>
+            <ul class="nav navbar-nav">
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">Add More Friends</a>
+                    <div class="dropdown-menu" id="online-friends-dropdown">
+                    </div>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
     
     <div id="title"><%=title %> </div>
     <div id="chatid" style="display: none"><%=chatid %></div>
     <div id="last-chat-color" style="visibility: hidden">5</div>
     <div id="username" style="display: none"><%=username %></div>
     <div id="chat-box"> </div>
-    <table id="display"> </table>
     
     <form id="message_form">
     	<div class="input-group mb-3">

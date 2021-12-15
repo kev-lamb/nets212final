@@ -30,16 +30,16 @@
         <script src="formvalidation.js"></script>
         <script src="newchat.js"> </script>
     </head>
-    <body onload="populate_form_with_friends()">
+    <body>
         <div class="signup-box">
             <h1>Create a New Chat</h1>
-            <i> Enter chat title and add users information below! </i> <br />
+            <i>What would you like to name your new chat?</i> <br />
             <form
             	id="chat-form"
                 action="/createchat"
                 method="POST"
             >
-                <label for="title">Title:</label>
+
                 <input
                     type="text"
                     id="title"
