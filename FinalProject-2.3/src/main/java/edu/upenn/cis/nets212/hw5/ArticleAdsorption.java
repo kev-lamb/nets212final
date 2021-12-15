@@ -520,6 +520,7 @@ public class ArticleAdsorption {
 				
 				/*
 				 * (new FilterOutAfterDate(date)).call(entry);
+				 * [Expanded to avoid serialization exception.]
 				 */
 				
 				{LocalDate currDateObj = LocalDate.parse(date);
@@ -530,9 +531,10 @@ public class ArticleAdsorption {
 				if (fromNode.type.equals("article")) {
 					String publishDate = fromNode.publishDate;
 					
-					// We add four years to the publish date of an article when interpreting it
-					// (per the instructions). 
-					LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					// We don't add four years to the publish date of the article, as
+					// this has already been done when the article node as created
+					// in getAllArticleCategoryData().
+					LocalDate nodeDateObj = LocalDate.parse(publishDate);
 					
 					if (nodeDateObj.isAfter(currDateObj)) {
 						return false;
@@ -544,9 +546,9 @@ public class ArticleAdsorption {
 				if (toNode.type.equals("article")) {
 					String publishDate = toNode.publishDate;
 					
-					// We add four years to the publish date of an article when interpreting it
-					// (per the instructions). 
-					// LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					// We don't add four years to the publish date of the article, as
+					// this has already been done when the article node as created
+					// in getAllArticleCategoryData().
 					LocalDate nodeDateObj = LocalDate.parse(publishDate);
 					
 					if (nodeDateObj.isAfter(currDateObj)) {
@@ -562,6 +564,7 @@ public class ArticleAdsorption {
 				
 				/*
 				 * (new FilterOutAfterDate(date)).call(entry);
+				 * [Expanded to avoid serialization exception.]
 				 */
 				
 				{LocalDate currDateObj = LocalDate.parse(date);
@@ -572,9 +575,9 @@ public class ArticleAdsorption {
 				if (fromNode.type.equals("article")) {
 					String publishDate = fromNode.publishDate;
 					
-					// We add four years to the publish date of an article when interpreting it
-					// (per the instructions). 
-					//LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					// We don't add four years to the publish date of the article, as
+					// this has already been done when the article node as created
+					// in getAllArticleCategoryData().
 					LocalDate nodeDateObj = LocalDate.parse(publishDate);
 					
 					if (nodeDateObj.isAfter(currDateObj)) {
@@ -587,9 +590,10 @@ public class ArticleAdsorption {
 				if (toNode.type.equals("article")) {
 					String publishDate = toNode.publishDate;
 					
-					// We add four years to the publish date of an article when interpreting it
-					// (per the instructions). 
-					LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					// We don't add four years to the publish date of the article, as
+					// this has already been done when the article node as created
+					// in getAllArticleCategoryData().
+					LocalDate nodeDateObj = LocalDate.parse(publishDate);
 					
 					if (nodeDateObj.isAfter(currDateObj)) {
 						return false;
@@ -822,6 +826,7 @@ public class ArticleAdsorption {
 				
 				/*
 				 * Map<String, Double> edgeScaledMap = fromNode.edgeScaleMap(edgeWeight);
+				 * [Expanded to avoid serialization exception.]
 				 */
 				
 				Map<String, Double> edgeScaledMap = new HashMap<>();
@@ -836,6 +841,7 @@ public class ArticleAdsorption {
 				
 				/*
 				 * toNode.addLabelMap(edgeScaledMap);
+				 * [Expanded to avoid serialization exception.]
 				 */
 				
 				Iterator<Entry<String, Double>> inputIter = edgeScaledMap.entrySet().iterator();
@@ -876,6 +882,7 @@ public class ArticleAdsorption {
 					
 					        /*
 					         * (new coalesceSeqOrCombFunc()).call(val1, val2);
+					         * [Expanded to avoid serialization exception.]
 					         */
 					     
 							{if (val.isEmpty()) {
@@ -924,6 +931,7 @@ public class ArticleAdsorption {
 							
 							/*
 					         * (new coalesceSeqOrCombFunc()).call(val1, val2);
+					         * [Expanded to avoid serialization exception.]
 					         */
 					     
 							{if (val1.isEmpty()) {
@@ -986,6 +994,7 @@ public class ArticleAdsorption {
 				
 				/*
 				 * node.finalizeLabelMap();
+				 * [Expanded to avoid serialization exception.]
 				 */
 				
 				// 1) normalizeLabelMap();
@@ -1083,7 +1092,8 @@ public class ArticleAdsorption {
 					.take(1);
 			System.out.println("The size of maxScoreDiffList is: " + String.valueOf(maxScoreDiffList.size()));
 			
-			// double maxScoreDiff = maxScoreDiffList.get(0)._1();
+			// Commented out to allow code to proceed: was encountering an error because maxScoreDiffList.size() == 0
+			// double maxScoreDiff = maxScoreDiffList.get(0)._1(); 
 			double maxScoreDiff = 19.0;
 			
 			if (maxScoreDiff <= dMax) {
@@ -1129,7 +1139,8 @@ public class ArticleAdsorption {
 				Node toNode = entry._1()._2();
 				
 				/*
-				 * toNode.zeroLabelMap();	
+				 * toNode.zeroLabelMap();
+				 * [Expanded to avoid serialization exception.]	
 				 */
 				
 				Iterator<Entry<String, Double>> iter = toNode.midIterLabelMap.entrySet().iterator();
