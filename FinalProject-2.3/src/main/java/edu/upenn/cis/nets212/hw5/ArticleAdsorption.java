@@ -1177,8 +1177,6 @@ public class ArticleAdsorption {
 		
 		System.out.println("validArticles size is: " + String.valueOf(validArticles.count()));
 		
-		validArticles.foreach(node -> System.out.println("Here is an inputUser score: " + String.valueOf(node.postIterLabelMap.get(inputUser))));
-		
 		// *Extract the <inputUser> score from each article's postIterLabelMap.*
 		
 		// 1) Some article nodes may have a null mapping for the inputUser. 
