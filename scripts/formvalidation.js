@@ -1,4 +1,5 @@
 function FormValidation(formId) {
+    console.log(formId);
     var elements;
     if (formId) {
         elements = document.getElementById(formId).querySelectorAll('input');

@@ -16,12 +16,12 @@ function loadPage() {
 }
 function initButton() {
     setButton();
-    setInterval(() => setButton(), 20000);
+    //setInterval(() => setButton(), 20000);
 }
 
 function initPost() {
     loadPost();
-    myInterval = setInterval(() => loadPost(), 20000);
+    //myInterval = setInterval(() => loadPost(), 20000);
 }
 
 function checkForPosts() {
@@ -92,15 +92,12 @@ function postNewPost(id) {
     if (!FormValidation(id)) {
         return false;
     }
-    console.log('in');
     let title = document.getElementById('title').value;
     let content = document.getElementById('content').value;
     if (id == 'createPostElse') {
         title = document.getElementById('titleElse').value;
         content = document.getElementById('contentElse').value;
     }
-    console.log(title);
-    console.log(content);
     let data = {
         title: title,
         content: content,
@@ -112,6 +109,10 @@ function postNewPost(id) {
     });
     document.getElementById('title').value = '';
     document.getElementById('content').value = '';
+    if (id == 'createPostElse') {
+        document.getElementById('titleElse').value = '';
+        document.getElementById('contentElse').value = '';
+    }
     return false;
 }
 
