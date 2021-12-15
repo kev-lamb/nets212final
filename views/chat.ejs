@@ -4,8 +4,56 @@
         <title>Home</title>
         <link
             rel="stylesheet"
-            href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+            href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
         />
+        <style>
+        	body {
+        		color: blue;
+        	
+        	}
+        	
+        	#chat-box {
+  				height: calc(100vh - 172px);
+  				overflow-y: scroll;
+  				padding: 0 15px 15px 15px;
+			}
+			#message_form {
+    			position: fixed;
+  				bottom: 0;
+  				left: 0;
+  				width: 100%;
+  				padding: 0 15px 15px 15px;
+  				height: 53px;
+			}
+			
+			#message-username {
+				color: grey;
+				font-style: italic;
+				font-size: 14px;
+			}
+			#message-content {
+				color: black;
+				font-weight: bold;
+				font-size: 14px;
+			}
+			#message-container-0 {
+				padding: 10px;
+				background-color: #f2f2f2;
+			}
+			#message-container-1 {
+				padding: 10px;
+				background-color: white;
+			}
+			
+			#title {
+				color: blue;
+				font-style: italic;
+				font-weight: bold;
+				font-size: 20px;
+				padding: 0 15px 15px 15px;
+			}
+			
+        </style>
         <script
             type="text/javascript"
             src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"
@@ -14,16 +62,38 @@
         <script src="chat.js"> </script>
     </head>
     <body onload="populate_chat_onLoad('<%=chatid%>')">
-    <p> Chat Log</p>
+    	<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  			<a class="navbar-brand" href="/">PennBook</a>
+  			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+    			<span class="navbar-toggler-icon"></span>
+  			</button>
+  			<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+    			<div class="navbar-nav">
+     				<a class="nav-item nav-link active" href="/account"><%= username %> <span class="sr-only">(current)</span></a>
+      				<a class="nav-item nav-link" href="/testchat">Chats</a>
+      				<a class="nav-item nav-link" href="#">Placeholder item</a>
+      				<a class="nav-item nav-link disabled" href="#">Placeholder item</a>
+    			</div>
+  			</div>
+		</nav>
+    
     <div id="title"><%=title %> </div>
-    <div id="chatid" style="visibility: hidden"><%=chatid %></div>
-    <div id="username"><%=username %></div>
+    <div id="chatid" style="display: none"><%=chatid %></div>
+    <div id="last-chat-color" style="visibility: hidden">5</div>
+    <div id="username" style="display: none"><%=username %></div>
     <div id="chat-box"> </div>
     <table id="display"> </table>
     
     <form id="message_form">
-    	<input type="text" id="new_message" name="new_message">
-    	<input type="submit" value="Create" id="submit>
+    	<div class="input-group mb-3">
+        <input type="text" class="form-control" id="new_message" name="new_message">
+        <div class="input-group-append">
+              <button class="btn btn-outline-secondary" type="button" id="submit">Send</button>
+   		</div>
+   		</div>
   </form>
+
+  
+  
     </body>
 </html>
