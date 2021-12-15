@@ -1256,6 +1256,9 @@ public class ArticleAdsorption {
 	
 	/*
 	
+	 **Serialization exceptions prevented these methods from being invoked as intended.
+	   Instead, the bodies of these methods have been written out when they are needed.**
+		 
 	// Private class whose call() method is invoked by a filter() in getNewsFeedNetwork() 
 	// when filtering out article nodes (and their corresponding edges) with publish dates
 	// after an input <date>.
@@ -1310,6 +1313,9 @@ public class ArticleAdsorption {
 	
 	/*
 
+     **Serialization exceptions prevented these methods from being invoked as intended.
+	   Instead, the bodies of these methods have been written out when they are needed.**
+    
 	// Private class whose call() method is invoked in the aggregateByKey() method 
 	// that coalesces the nodes in updatedNonSourceNodes. Serves as the seq or comb function.
 	// (See JavaDocs for clarification.)
@@ -1410,6 +1416,9 @@ public class ArticleAdsorption {
 		}
 		
 		/*
+		 
+		 **Serialization exceptions prevented these methods from being invoked as intended.
+		 Instead, the bodies of these methods have been written out when they are needed.**
 		 
 		// *Scale the postIterLabelMap's values by an input edgeWeight, in a newly-created Map.*
 		// (In preparation for propagating this scaled LabelMap to an out-neighbor Node.)
