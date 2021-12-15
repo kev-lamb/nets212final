@@ -106,49 +106,42 @@ public class ArticleAdsorption {
 	 * @throws InterruptedException
 	 */
 	private void initializeTables() throws DynamoDbException, InterruptedException {
+		logger.info("Beginning initializeTables...");
 		try {
 			news = db.createTable("News", Arrays.asList(new KeySchemaElement("link", KeyType.HASH)),																				     
-					Arrays.asList(new AttributeDefinition("link", ScalarAttributeType.S), 
-							new AttributeDefinition("likes", ScalarAttributeType.S), 
-							new AttributeDefinition("category", ScalarAttributeType.S), 
-							new AttributeDefinition("headline", ScalarAttributeType.S), 
-							new AttributeDefinition("authors", ScalarAttributeType.S), 
-							new AttributeDefinition("short_description", ScalarAttributeType.S), 
-							new AttributeDefinition("date", ScalarAttributeType.S)),
+					Arrays.asList(new AttributeDefinition("link", ScalarAttributeType.S)),
 					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
 
 			news.waitForActive();
 		} catch (final ResourceInUseException exists) {
 			news = db.getTable("News");
 		}
-		
+		logger.info("Created the News table.");
 		try {
 			likes = db.createTable("Likes", 
 					Arrays.asList(new KeySchemaElement("UserID", KeyType.HASH), 
 							new KeySchemaElement("link", KeyType.RANGE)), 																			         
 					Arrays.asList(new AttributeDefinition("UserID", ScalarAttributeType.S),
-							new AttributeDefinition("link", ScalarAttributeType.S), 
-							new AttributeDefinition("date", ScalarAttributeType.S)),
+							new AttributeDefinition("link", ScalarAttributeType.S)),
 					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
 
 			likes.waitForActive();
 		} catch (final ResourceInUseException exists) {
 			likes = db.getTable("Likes");
 		}
-		
+		logger.info("Created the Likes table.");
 		try {
 			recommended = db.createTable("Recommended", 
 					Arrays.asList(new KeySchemaElement("UserID", KeyType.HASH), 
 							new KeySchemaElement("link", KeyType.RANGE)), 																			         
 					Arrays.asList(new AttributeDefinition("UserID", ScalarAttributeType.S),
-							new AttributeDefinition("link", ScalarAttributeType.S), 
-							new AttributeDefinition("date", ScalarAttributeType.S)),
+							new AttributeDefinition("link", ScalarAttributeType.S)),
 					new ProvisionedThroughput(25L, 25L)); // Stay within the free tier
 			recommended.waitForActive();
 		} catch (final ResourceInUseException exists) {
 			recommended = db.getTable("Recommended");
 		}
-
+		logger.info("Created the Recommended table.");
 	}
 
 	/**
@@ -169,10 +162,12 @@ public class ArticleAdsorption {
 		db = DynamoConnector.getConnection(Config.DYNAMODB_URL);	
 		logger.debug("Connected to DynamoDB!");
 		
-		
+	
 		users = db.getTable("Users");
 		friends = db.getTable("Friends");
 		initializeTables(); // Assigns references to the news, likes, and recommended Table fields. 
+		
+		logger.info("Tables initialized successfully.");
 		
 		// Perform the single read of the news feed JSON data, 
 		// assigning a value to the articleCategoryGraph field.
@@ -199,6 +194,9 @@ public class ArticleAdsorption {
 	 * @throws IOException
 	 */
 	void getAllArticleCategoryData(String filePath) throws IOException {
+		
+		logger.info("Beginning getAllArticleCategoryData (read of JSON data)...");
+		
 		String line;
 		BufferedReader reader = new BufferedReader(new FileReader(new File(filePath)));
 		JsonParser parser = new JsonParser();
@@ -354,6 +352,8 @@ public class ArticleAdsorption {
 	    
 	    // 7) Union the PairRDD's to create the output PairRDD.
 		this.articleCategoryGraph = finalFromArticle.union(finalFromCategory);
+		
+		logger.info("getAllArticleCategoryData complete.");
 	}
 	
 	/**
@@ -386,7 +386,9 @@ public class ArticleAdsorption {
 	 * @throws IOException, DynamoDbException
 	 */
 	JavaPairRDD<Tuple2<Node, Node>, Double> getNewsFeedNetwork(String date) throws IOException, DynamoDbException {
-
+        
+		logger.info("Beginning getNewsFeedNetwork...");
+		
 		// Lists to be accumulated and soon converted to multiple PairRDD<Tuple2<Node, Node>, Double>'s
 		// through context.parallelizePairs() calls.
 		List<Tuple2<Tuple2<Node, Node>, Double>> userUserWeightList = new ArrayList<>();
@@ -618,6 +620,8 @@ public class ArticleAdsorption {
 	    		.union(finalUserToArticle)
 	    		.union(finalArticleToUser);
 	    
+	    logger.info("getNewsFeedNetwork complete.");
+	    
 		return overallNetwork;
 	}
 
@@ -643,7 +647,7 @@ public class ArticleAdsorption {
 	 * @throws InterruptedException User presses Ctrl-C
 	 */
 	public String run(double dMax, int iMax, boolean debug, String inputUser, String date) throws IOException, InterruptedException {
-		logger.info("Running");
+		logger.info("Beginning run method...");
 
 		// Load the network.
 		JavaPairRDD<Tuple2<Node, Node>, Double> network = getNewsFeedNetwork(date);
@@ -892,6 +896,7 @@ public class ArticleAdsorption {
 			
 		logger.info("*** Finished adsorption algorithm! ***");
 		
+		System.out.println("The selected link is: " + selectedLink);
 		return selectedLink;
 	}
 
@@ -1177,6 +1182,22 @@ public class ArticleAdsorption {
 	         */
 	        return (this.name.equals(node.name) && this.type.equals(node.type));
 	    }
+	}
+	
+	public static void main(String[] args) {
+		ArticleAdsorption aa = new ArticleAdsorption();
+
+		try {
+			aa.initialize();
+			aa.run(0.5, 5, false, "scott", "2021-12-14");
+		} catch (final IOException ie) {
+			logger.error("I/O error: ");
+			ie.printStackTrace();
+		} catch (final InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+			aa.shutdown();
+		}
 	}
 	
 }
