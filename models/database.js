@@ -1,7 +1,7 @@
 var AWS = require('aws-sdk');
 AWS.config.update({ region: 'us-east-1' });
 var db = new AWS.DynamoDB();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 // Verify that the provided login information matches an item in the users table

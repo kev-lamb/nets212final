@@ -92,6 +92,7 @@ function postNewPost(id) {
     if (!FormValidation(id)) {
         return false;
     }
+    console.log('in');
     let title = document.getElementById('title').value;
     let content = document.getElementById('content').value;
     if (id == 'createPostElse') {
@@ -115,6 +116,8 @@ function postNewPost(id) {
 }
 
 function loadPost() {
+    let active = document.activeElement.id;
+    console.log('load posts');
     let data = {
         username: person,
     };
@@ -131,22 +134,27 @@ function loadPost() {
     promisesBigQuery.push(
         $.get('/getwallposts', data).then((ret) => ret.Items)
     );
-    Promise.all(promisesBigQuery).then((results) => {
-        let arr = [...results[0], ...results[1]];
-        arr = arr.filter(
-            (post, index, self) =>
-                index ===
-                self.findIndex(
-                    (t) =>
-                        t.poster.S === post.poster.S && t.time.N === post.time.N
-                )
-        );
-        arr.sort((a, b) => a.time.N - b.time.N);
-        for (item of arr.reverse()) {
-            content += createPost(item);
-        }
-        document.getElementById('posts').innerHTML = content;
-    });
+    Promise.all(promisesBigQuery)
+        .then((results) => {
+            let arr = [...results[0], ...results[1]];
+            arr = arr.filter(
+                (post, index, self) =>
+                    index ===
+                    self.findIndex(
+                        (t) =>
+                            t.poster.S === post.poster.S &&
+                            t.time.N === post.time.N
+                    )
+            );
+            arr.sort((a, b) => a.time.N - b.time.N);
+            for (item of arr.reverse()) {
+                content += createPost(item);
+            }
+            document.getElementById('posts').innerHTML = content;
+        })
+        .then(() => {
+            loadComments(active);
+        });
 }
 function deletePost(username, time) {
     console.log('deleting post');
