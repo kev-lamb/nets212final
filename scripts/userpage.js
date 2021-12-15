@@ -16,12 +16,12 @@ function loadPage() {
 }
 function initButton() {
     setButton();
-    //setInterval(() => setButton(), 20000);
+    setInterval(() => setButton(), 20000);
 }
 
 function initPost() {
     loadPost();
-    //myInterval = setInterval(() => loadPost(), 20000);
+    myInterval = setInterval(() => loadPost(), 20000);
 }
 
 function checkForPosts() {
@@ -50,6 +50,17 @@ function setButton() {
             element.innerText = 'Remove Friend';
             element.classList.add('btn-danger');
             isFriends = true;
+        }
+        if (!isFriends) {
+            document.getElementById('createPost').style.display = 'none';
+            document.getElementById('createPostElse').style.display = 'none';
+        } else {
+            if (!mypage) {
+                document.getElementById('createPostElse').style.display =
+                    'inline';
+            } else {
+                document.getElementById('createPost').style.display = 'inline';
+            }
         }
         checkForPosts();
     });
