@@ -15,7 +15,8 @@ public class Config {
 	/**
 	 * The path to the news feed data
 	 */
-	public static String NEWS_FEED_PATH = "target/News_Category_Dataset_v2.json";
+	//public static String NEWS_FEED_PATH = "target/News_Category_Dataset_v2.json";
+	public static String NEWS_FEED_PATH = "target/shorter_news_category_dataset_v2.json";
 	
 	public static String LOCAL_SPARK = "local[*]";
 

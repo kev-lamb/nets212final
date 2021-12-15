@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Serializable;
 
 import java.time.LocalDate;
 
@@ -49,6 +50,7 @@ import scala.Tuple2;
 import software.amazon.awssdk.services.dynamodb.model.DynamoDbException;
 
 public class ArticleAdsorption {
+	
 	/**
 	 * The basic logger
 	 */
@@ -267,9 +269,16 @@ public class ArticleAdsorption {
 				
 				// currField.equals("date")
 				if (i == 5) {
-					item.withString("date", jsonFieldString);
 					
-					articleNode.publishDate = jsonFieldString;
+					// We must add four years to the JSON's listed publish date.
+	
+					LocalDate dateObj = LocalDate.parse(jsonFieldString).plusYears(4);
+					String correctedDate = dateObj.toString();
+					
+					item.withString("date", correctedDate);
+					articleNode.publishDate = correctedDate;
+					
+					// System.out.println("Here is a corrected date: " + correctedDate);
 				}							
 			}
 			
@@ -353,6 +362,17 @@ public class ArticleAdsorption {
 	    // 7) Union the PairRDD's to create the output PairRDD.
 		this.articleCategoryGraph = finalFromArticle.union(finalFromCategory);
 		
+		
+		JavaRDD<Node> fromNodes = this.articleCategoryGraph.map(entry -> entry._1._1);
+		JavaRDD<Node> toNodes = this.articleCategoryGraph.map(entry -> entry._1._2);
+		long numNodes = fromNodes.union(toNodes).distinct().count();
+		
+        long numEdges = articleCategoryGraph.count();
+        
+		System.out.println("The articleCategoryGraph contains " + String.valueOf(numNodes) + " nodes and "
+				+ String.valueOf(numEdges) + " edges.");
+		
+		
 		logger.info("getAllArticleCategoryData complete.");
 	}
 	
@@ -396,14 +416,18 @@ public class ArticleAdsorption {
 		List<Tuple2<Tuple2<Node, Node>, Double>> userArticleWeightList = new ArrayList<>();
 		
 		// Scan the Friends table to create (u, u') edges.
+		Map<String, String> expressionAttrNameMap = new HashMap<>();
+		expressionAttrNameMap.put("#u", "user");
+		
 		ItemCollection<ScanOutcome> friendsResults = friends.scan(new ScanSpec()
-				.withProjectionExpression("User, Friend"));
+				.withProjectionExpression("#u, friend")
+				.withNameMap(expressionAttrNameMap));
 		Iterator<Item> itemIter = friendsResults.iterator();
 			
 		while (itemIter.hasNext()) {
 		    Item item = itemIter.next();
-		    String userOneName = item.getString("User");
-		    String userTwoName = item.getString("Friend");
+		    String userOneName = item.getString("user");
+		    String userTwoName = item.getString("friend");
 		     
 		    Node userOneNode = new Node(userOneName, "user");
 		    Node userTwoNode = new Node(userTwoName, "user");
@@ -421,15 +445,15 @@ public class ArticleAdsorption {
 		
 		// Scan the Users table to create (u, c) and (c, u) edges.
 		ItemCollection<ScanOutcome> usersResults = users.scan(new ScanSpec()
-				.withProjectionExpression("Login name, List of Interests"));
+				.withProjectionExpression("username, list_of_interests"));
 		itemIter = usersResults.iterator();
 		
 		while (itemIter.hasNext()) {
             Item item = itemIter.next();
-            String username = item.getString("Login name");
+            String username = item.getString("username");
             Node userNode = new Node(username, "user");
              
-            List<String> interestList = item.getList("List of Interests");
+            List<String> interestList = item.getList("list_of_interests");
              
             Iterator<String> interestListIter = interestList.iterator();
             while (interestListIter.hasNext()) {
@@ -449,8 +473,12 @@ public class ArticleAdsorption {
         }
 		
 		// Scan the Likes table to create (u, a) and (a, u) edges.
+		expressionAttrNameMap = new HashMap<>();
+		expressionAttrNameMap.put("#d", "date");
+		
 		ItemCollection<ScanOutcome> likesResults = likes.scan(new ScanSpec()
-				.withProjectionExpression("UserID, link, date"));
+				.withProjectionExpression("UserID, link, #d")
+				.withNameMap(expressionAttrNameMap));
 		itemIter = likesResults.iterator();
 		
 		while (itemIter.hasNext()) {
@@ -478,6 +506,8 @@ public class ArticleAdsorption {
 		JavaPairRDD<Tuple2<Node, Node>, Double> userCategoryGraph = context.parallelizePairs(userCategoryWeightList);
 		JavaPairRDD<Tuple2<Node, Node>, Double> userArticleGraph = context.parallelizePairs(userArticleWeightList);
 		
+		logger.info("Filtering out the articles based on the date parameter.");
+		
 		/*
 		 * Filter the articleCategoryGraph and the userArticleGraph by <date>.
 		 * If an article has a publish date after <date>, its associated edge should be removed.
@@ -486,10 +516,90 @@ public class ArticleAdsorption {
 		 */
 		
 		JavaPairRDD<Tuple2<Node, Node>, Double> articleCategoryFiltered = articleCategoryGraph.filter
-				(entry -> (new FilterOutAfterDate(date)).call(entry));
+				(entry -> 
+				
+				/*
+				 * (new FilterOutAfterDate(date)).call(entry);
+				 */
+				
+				{LocalDate currDateObj = LocalDate.parse(date);
+				Node fromNode = entry._1._1;
+				Node toNode = entry._1._2;
+				
+				// Test the fromNode.
+				if (fromNode.type.equals("article")) {
+					String publishDate = fromNode.publishDate;
+					
+					// We add four years to the publish date of an article when interpreting it
+					// (per the instructions). 
+					LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					
+					if (nodeDateObj.isAfter(currDateObj)) {
+						return false;
+					}
+					
+				}
+				
+				// Test the toNode.
+				if (toNode.type.equals("article")) {
+					String publishDate = toNode.publishDate;
+					
+					// We add four years to the publish date of an article when interpreting it
+					// (per the instructions). 
+					// LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					LocalDate nodeDateObj = LocalDate.parse(publishDate);
+					
+					if (nodeDateObj.isAfter(currDateObj)) {
+						return false;
+					}
+				}
+				
+				// All clear!
+				return true;});
 		
 		JavaPairRDD<Tuple2<Node, Node>, Double> userArticleFiltered = userArticleGraph.filter
-				(entry -> (new FilterOutAfterDate(date)).call(entry));
+				(entry -> 
+				
+				/*
+				 * (new FilterOutAfterDate(date)).call(entry);
+				 */
+				
+				{LocalDate currDateObj = LocalDate.parse(date);
+				Node fromNode = entry._1._1;
+				Node toNode = entry._1._2;
+				
+				// Test the fromNode.
+				if (fromNode.type.equals("article")) {
+					String publishDate = fromNode.publishDate;
+					
+					// We add four years to the publish date of an article when interpreting it
+					// (per the instructions). 
+					//LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					LocalDate nodeDateObj = LocalDate.parse(publishDate);
+					
+					if (nodeDateObj.isAfter(currDateObj)) {
+						return false;
+					}
+					
+				}
+				
+				// Test the toNode.
+				if (toNode.type.equals("article")) {
+					String publishDate = toNode.publishDate;
+					
+					// We add four years to the publish date of an article when interpreting it
+					// (per the instructions). 
+					LocalDate nodeDateObj = LocalDate.parse(publishDate).plusYears(4);
+					
+					if (nodeDateObj.isAfter(currDateObj)) {
+						return false;
+					}
+				}
+				
+				// All clear!
+				return true;});
+		
+		logger.info("Properly initializing the edge weights of the overall network.");
 		
 		/* 
 		 * Properly initialize the edge weights (in accordance with the guidelines).
@@ -620,6 +730,17 @@ public class ArticleAdsorption {
 	    		.union(finalUserToArticle)
 	    		.union(finalArticleToUser);
 	    
+	    
+		JavaRDD<Node> fromNodes = overallNetwork.map(entry -> entry._1._1);
+		JavaRDD<Node> toNodes = overallNetwork.map(entry -> entry._1._2);
+		long numNodes = fromNodes.union(toNodes).distinct().count();
+		
+        long numEdges = overallNetwork.count();
+        
+		System.out.println("The overallNetwork contains " + String.valueOf(numNodes) + " nodes and "
+				+ String.valueOf(numEdges) + " edges.");
+	    
+	    
 	    logger.info("getNewsFeedNetwork complete.");
 	    
 		return overallNetwork;
@@ -652,6 +773,8 @@ public class ArticleAdsorption {
 		// Load the network.
 		JavaPairRDD<Tuple2<Node, Node>, Double> network = getNewsFeedNetwork(date);
 		
+		logger.info("Beginning adsorption algorithm on overall network...");
+		
 		/*
 		 * Conduct the adsorption algorithm on the network.
 		 */
@@ -662,15 +785,23 @@ public class ArticleAdsorption {
 		JavaRDD<Node> toNodes = network.map(pair -> pair._1()._2()).distinct();
 		JavaRDD<Node> nodes = fromNodes.union(toNodes).distinct();
 		
+		System.out.println("nodes size is: " + String.valueOf(nodes.count()));
+		
         // Determine the source nodes. Note that their user scores will stay constant 
 		// throughout the algorithm (in the case of a non-user node, 0.0 for all 
 		// user scores), thus their user scores may be freely ignored. 
 		JavaRDD<Node> sourceNodes = nodes.subtract(toNodes);
 		
+		System.out.println("sourceNodes size is: " + String.valueOf(sourceNodes.count()));
+		
 		// The non-source nodes will be the ones with user scores we care about.
 		// This is the variable we will continue to update with the most current
 		// postIterLabelMaps for each of its nodes. 
 		JavaRDD<Node> nonSourceNodes = nodes.subtract(sourceNodes);
+
+		System.out.println("nonSourceNodes size is: " + String.valueOf(nonSourceNodes.count()));
+		
+		System.out.println("diff in nodasdf size is: " + String.valueOf(nonSourceNodes.subtract(sourceNodes).count()));
 		
 		// (Variable defined outside the scope of the upcoming while loop merely so it may be 
 		// invoked after the while loop. Irrelevant value at the moment.)
@@ -689,8 +820,41 @@ public class ArticleAdsorption {
 				Node toNode = entry._1()._2();
 				Double edgeWeight = entry._2();
 				
-				Map<String, Double> edgeScaledMap = fromNode.edgeScaleMap(edgeWeight);
-				toNode.addLabelMap(edgeScaledMap);
+				/*
+				 * Map<String, Double> edgeScaledMap = fromNode.edgeScaleMap(edgeWeight);
+				 */
+				
+				Map<String, Double> edgeScaledMap = new HashMap<>();
+				
+				Iterator<Entry<String, Double>> iter = fromNode.postIterLabelMap.entrySet().iterator();
+				while (iter.hasNext()) {
+					Entry<String, Double> entryy = iter.next();
+					String user = entryy.getKey();
+					Double entryScore = entryy.getValue();
+					edgeScaledMap.put(user, entryScore * edgeWeight);
+				}
+				
+				/*
+				 * toNode.addLabelMap(edgeScaledMap);
+				 */
+				
+				Iterator<Entry<String, Double>> inputIter = edgeScaledMap.entrySet().iterator();
+				while (inputIter.hasNext()) {
+					Entry<String, Double> inputEntry = inputIter.next();
+					String user = inputEntry.getKey();
+					Double inputScore = inputEntry.getValue();
+					
+					Double currScore = toNode.midIterLabelMap.get(user);
+					if (currScore != null) {
+						toNode.midIterLabelMap.put(user, currScore + inputScore);		
+					} else {
+						// toNode had not heard of the user until this point!
+						// Update the midIterLabelMap to include an entry <user, inputScore>.
+						// (I.e., currScore was effectively 0.0 beforehand.)
+						toNode.midIterLabelMap.put(user, inputScore);	
+					}
+				}
+				
 			});
 			
 			// Among the non-source nodes, coalesce each Node representing the same vertex,
@@ -708,8 +872,102 @@ public class ArticleAdsorption {
 			
 			JavaPairRDD<Node, Map<String, Double>> coalesced = nonsourceNodeAndLabelMap
 					.aggregateByKey(new HashMap<String, Double>(), 
-							(val, row) -> (new coalesceSeqOrCombFunc()).call(val, row),      // Seq
-							(val1, val2) -> (new coalesceSeqOrCombFunc()).call(val1, val2)); // Comb
+							(val, row) -> 
+					
+					        /*
+					         * (new coalesceSeqOrCombFunc()).call(val1, val2);
+					         */
+					     
+							{if (val.isEmpty()) {
+								// The empty map serves as our zeroValue in the aggregateByKey() call.
+								// It is to be interpreted as a map from each user to the double 0.0.
+								return row;
+							} else {
+								// A non-trivial sumMap:
+								HashMap<String, Double> sumMap = new HashMap<>();
+								
+								Iterator<Entry<String, Double>> iter = row.entrySet().iterator();
+								while (iter.hasNext()) {
+									Entry<String, Double> entry = iter.next();
+									String user = entry.getKey();
+									Double score = entry.getValue();
+									
+									Double valMapScore = val.get(user);
+						            if (valMapScore != null) {
+						            	sumMap.put(user, score + valMapScore);
+						            } else {
+						            	// The valMapScore may be interpreted as 0.0.
+						            	// (An absence of a <User, Score> entry in any LabelMap is
+						            	// equivalent to a mapping of <User, 0.0>.)
+						            	sumMap.put(user, score);
+						            }	
+								}
+								
+								// We must now consider the user entries that appear in the valMap
+								// but do NOT appear in the rowMap.
+								
+								iter = val.entrySet().iterator();
+								while (iter.hasNext()) {
+									Entry<String, Double> entry = iter.next();
+									String user = entry.getKey();
+									Double score = entry.getValue();
+									
+									Double rowMapScore = row.get(user);
+						            if (rowMapScore == null) {
+						            	sumMap.put(user, score);
+						            } 
+								}
+								
+								return sumMap;				
+							}},      
+							(val1, val2) -> 
+							
+							/*
+					         * (new coalesceSeqOrCombFunc()).call(val1, val2);
+					         */
+					     
+							{if (val1.isEmpty()) {
+								// The empty map serves as our zeroValue in the aggregateByKey() call.
+								// It is to be interpreted as a map from each user to the double 0.0.
+								return val2;
+							} else {
+								// A non-trivial sumMap:
+								HashMap<String, Double> sumMap = new HashMap<>();
+								
+								Iterator<Entry<String, Double>> iter = val2.entrySet().iterator();
+								while (iter.hasNext()) {
+									Entry<String, Double> entry = iter.next();
+									String user = entry.getKey();
+									Double score = entry.getValue();
+									
+									Double valMapScore = val1.get(user);
+						            if (valMapScore != null) {
+						            	sumMap.put(user, score + valMapScore);
+						            } else {
+						            	// The valMapScore may be interpreted as 0.0.
+						            	// (An absence of a <User, Score> entry in any LabelMap is
+						            	// equivalent to a mapping of <User, 0.0>.)
+						            	sumMap.put(user, score);
+						            }	
+								}
+								
+								// We must now consider the user entries that appear in the val1Map
+								// but do NOT appear in the val2Map.
+								
+								iter = val1.entrySet().iterator();
+								while (iter.hasNext()) {
+									Entry<String, Double> entry = iter.next();
+									String user = entry.getKey();
+									Double score = entry.getValue();
+									
+									Double rowMapScore = val2.get(user);
+						            if (rowMapScore == null) {
+						            	sumMap.put(user, score);
+						            } 
+								}
+								
+								return sumMap;				
+							}});
 			
 			// (At this point, no more duplicate nodes are present.)
 			
@@ -725,7 +983,47 @@ public class ArticleAdsorption {
 			
 			// Now finalize the postIterLabelMaps for each node in updatedNonSourceNodes.
 			updatedNonSourceNodes.foreach(node -> {
-				node.finalizeLabelMap();
+				
+				/*
+				 * node.finalizeLabelMap();
+				 */
+				
+				// 1) normalizeLabelMap();
+				// Sum the scores across all users.
+				Double scoreSum = 0.0;
+				
+				Iterator<Entry<String, Double>> firstIter = node.midIterLabelMap.entrySet().iterator();
+				while (firstIter.hasNext()) {
+					Entry<String, Double> entry = firstIter.next();
+					Double entryScore = entry.getValue();
+					scoreSum += entryScore;
+				}
+				
+				// Scale each score by (1 / scoreSum).
+				Iterator<Entry<String, Double>> secondIter = node.midIterLabelMap.entrySet().iterator();
+				while (secondIter.hasNext()) {
+					Entry<String, Double> entry = secondIter.next();
+					String user = entry.getKey();
+					Double entryScore = entry.getValue();
+					node.midIterLabelMap.put(user, entryScore / scoreSum);
+				}
+				
+				// 2) Set postIterLabelMap -> midIterLabelMap.
+				Iterator<Entry<String, Double>> iter = node.midIterLabelMap.entrySet().iterator();
+				while (iter.hasNext()) {
+					Entry<String, Double> entry = iter.next();
+					String user = entry.getKey();
+					Double entryScore = entry.getValue();
+					node.postIterLabelMap.put(user, entryScore);
+				}
+				
+				// 3) zeroLabelMap();
+				Iterator<Entry<String, Double>> iterr = node.midIterLabelMap.entrySet().iterator();
+				while (iterr.hasNext()) {
+					Entry<String, Double> entryy = iterr.next();
+					String user = entryy.getKey();
+					node.midIterLabelMap.put(user, 0.0);
+				}
 			});
 			
 			/*
@@ -736,6 +1034,9 @@ public class ArticleAdsorption {
 			
 			}
 			
+			System.out.println("nonSourceNodes size is: " + String.valueOf(nonSourceNodes.count()));
+			System.out.println("updatedNonSourceNodes size is: " + String.valueOf(updatedNonSourceNodes.count()));
+			
 			
 			/*
 			 * Test for convergence by comparing nonSourceNodes and updatedNonSourceNodes.
@@ -744,6 +1045,7 @@ public class ArticleAdsorption {
 			// A PairRDD created to facilitate an upcoming join().
 			JavaPairRDD<Node, Node> convenientPairOne = updatedNonSourceNodes
 					.mapToPair(node -> new Tuple2<Node, Node>(node, node));
+			
 			
 			// A PairRDD created to facilitate an upcoming join().
 			JavaPairRDD<Node, Node> convenientPairTwo = nonSourceNodes
@@ -754,17 +1056,35 @@ public class ArticleAdsorption {
 			JavaPairRDD<Node, Node> newNodeAndOldNode = joinRDD
 					.mapToPair(entry -> new Tuple2<Node, Node>(entry._2._1, entry._2._2));
 			
+			System.out.println("newNodeAndOldNode size is: " + String.valueOf(newNodeAndOldNode.count()));
+			
+			// Some article nodes may have a null mapping for the inputUser. 
+			// (They were never "told" about them.)
+			// This should be equivalent to a mapping to the value 0.0.
+			
+			newNodeAndOldNode.foreach(entry -> 
+					{Node future = entry._1;
+					 Node past = entry._2;
+					 
+					 future.postIterLabelMap.putIfAbsent(inputUser, 0.0);
+					 past.postIterLabelMap.putIfAbsent(inputUser, 0.0);		
+					});
+			
 			JavaPairRDD<Node, Double> nodeAndScoreDiff = newNodeAndOldNode
 					.mapToPair(pair -> new Tuple2<Node, Double>(pair._1,
 							pair._1.postIterLabelMap.get(inputUser)
 							- pair._2.postIterLabelMap.get(inputUser)));
+			
+			System.out.println("nodeAndScoreDiff size is: " + String.valueOf(nodeAndScoreDiff.count()));
 
 			List<Tuple2<Double, Node>> maxScoreDiffList = nodeAndScoreDiff
 					.mapToPair(pair -> new Tuple2<Double, Node>(pair._2, pair._1))
 					.sortByKey(false)
 					.take(1);
+			System.out.println("The size of maxScoreDiffList is: " + String.valueOf(maxScoreDiffList.size()));
 			
-			double maxScoreDiff = maxScoreDiffList.get(0)._1();
+			// double maxScoreDiff = maxScoreDiffList.get(0)._1();
+			double maxScoreDiff = 19.0;
 			
 			if (maxScoreDiff <= dMax) {
 				break;
@@ -807,7 +1127,17 @@ public class ArticleAdsorption {
 			// (In preparation for the next iteration.)
 			network.foreach(entry -> {
 				Node toNode = entry._1()._2();
-				toNode.zeroLabelMap();	
+				
+				/*
+				 * toNode.zeroLabelMap();	
+				 */
+				
+				Iterator<Entry<String, Double>> iter = toNode.midIterLabelMap.entrySet().iterator();
+				while (iter.hasNext()) {
+					Entry<String, Double> entryy = iter.next();
+					String user = entryy.getKey();
+					toNode.midIterLabelMap.put(user, 0.0);
+				}
 			});
 				
 			// We can now pass nonSourceNodes to its updated value. 
@@ -828,6 +1158,8 @@ public class ArticleAdsorption {
 		JavaRDD<Node> todaysArticles = updatedNonSourceNodes
 				.filter(node -> node.type.equals("article") && node.publishDate.equals(date));
 		
+		System.out.println("todaysArticles size is: " + String.valueOf(todaysArticles.count()));
+		
 		// *Filter out the articles that were already recommended to the <inputUser>.*
 		// 1) Accumulate a List<Node> of the query results. 
 		ItemCollection<QueryOutcome> queryResults = recommended.query("UserID", inputUser);
@@ -843,12 +1175,18 @@ public class ArticleAdsorption {
 		JavaRDD<Node> queryResultRDD = context.parallelize(queryResultNodes);
 		JavaRDD<Node> validArticles = todaysArticles.subtract(queryResultRDD);
 		
+		System.out.println("validArticles size is: " + String.valueOf(validArticles.count()));
+		
+		validArticles.foreach(node -> System.out.println("Here is an inputUser score: " + String.valueOf(node.postIterLabelMap.get(inputUser))));
+		
 		// *Extract the <inputUser> score from each article's postIterLabelMap.*
 		
 		// 1) Some article nodes may have a null mapping for the inputUser. 
 		//    (They were never "told" about them.)
 		//    This should be equivalent to a mapping to the value 0.0.
 		validArticles.foreach(node -> node.postIterLabelMap.putIfAbsent(inputUser, 0.0));
+		
+		validArticles.foreach(node -> System.out.println("Here is an inputUser score: " + String.valueOf(node.postIterLabelMap.get(inputUser))));
 		
 		// 2) Now proceed as intended.
 		JavaPairRDD<Node, Double> articleAndUserScore = validArticles
@@ -874,6 +1212,10 @@ public class ArticleAdsorption {
 		
 		List<Pair<Node, Double>> asPairList = asPairs.collect();
 		
+		System.out.println("asPairList size is: " + String.valueOf(asPairList.size()));
+		//return "boy";
+		
+		///*
 		// 2) Complete the weighted selection using an EnumeratedDistribution object.
 		Node selectedNode = new EnumeratedDistribution<Node>(asPairList).sample();
 		
@@ -898,6 +1240,7 @@ public class ArticleAdsorption {
 		
 		System.out.println("The selected link is: " + selectedLink);
 		return selectedLink;
+		//*/
 	}
 
 
@@ -913,14 +1256,13 @@ public class ArticleAdsorption {
 		DynamoConnector.shutdown();
 	}
 	
+	/*
+	
 	// Private class whose call() method is invoked by a filter() in getNewsFeedNetwork() 
 	// when filtering out article nodes (and their corresponding edges) with publish dates
 	// after an input <date>.
-	private class FilterOutAfterDate implements Function<Tuple2<Tuple2<Node, Node>, Double>, Boolean> {
+	private class FilterOutAfterDate implements Function<Tuple2<Tuple2<Node, Node>, Double>, Boolean>, Serializable {
 		
-		/**
-		 * 
-		 */
 		private static final long serialVersionUID = 1L;
 		
 		LocalDate currDateObj; // A LocalDate object created from the input <date> in the class constructor.
@@ -965,15 +1307,16 @@ public class ArticleAdsorption {
 			return true;
 		}
 	}
+
+    */
 	
+	/*
+
 	// Private class whose call() method is invoked in the aggregateByKey() method 
 	// that coalesces the nodes in updatedNonSourceNodes. Serves as the seq or comb function.
 	// (See JavaDocs for clarification.)
-	private class coalesceSeqOrCombFunc implements Function2<Map<String, Double>, Map<String, Double>, Map<String, Double>> {
+	private class coalesceSeqOrCombFunc implements Function2<Map<String, Double>, Map<String, Double>, Map<String, Double>>, Serializable {
 		
-		/**
-		 * 
-		 */
 		private static final long serialVersionUID = 1L;
 
 		// Sum the two maps, value-by-value, into a new map.
@@ -1024,12 +1367,19 @@ public class ArticleAdsorption {
 		
 	}
 	
+	*/
+	
 	/**
 	 * A helper class to define each node type (user, category, article) all under a single object.
 	 * 
 	 * @author nets212
 	 */
-	private class Node {
+	private static class Node implements Serializable {
+		
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
 		
 		// "user", "category", or "article".
 		private String type;
@@ -1061,6 +1411,8 @@ public class ArticleAdsorption {
 			}
 		}
 		
+		/*
+		 
 		// *Scale the postIterLabelMap's values by an input edgeWeight, in a newly-created Map.*
 		// (In preparation for propagating this scaled LabelMap to an out-neighbor Node.)
 		private Map<String, Double> edgeScaleMap(double edgeWeight) {
@@ -1155,6 +1507,8 @@ public class ArticleAdsorption {
 			zeroLabelMap(); // Unnecessary??
 		}
 		
+		*/
+		
 	    @Override
 	    public boolean equals(Object o) {
 	 
@@ -1189,7 +1543,7 @@ public class ArticleAdsorption {
 
 		try {
 			aa.initialize();
-			aa.run(0.5, 5, false, "scott", "2021-12-14");
+			aa.run(0.5, 1, false, "scott", "2022-05-24");
 		} catch (final IOException ie) {
 			logger.error("I/O error: ");
 			ie.printStackTrace();
