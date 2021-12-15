@@ -1,7 +1,7 @@
 var AWS = require('aws-sdk');
 AWS.config.update({ region: 'us-east-1' });
 var db = new AWS.DynamoDB();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 // Verify that the provided login information matches an item in the users table
@@ -133,6 +133,9 @@ var myDB_new_acc_check = function (inputData, callback) {
                                 birthday: {
                                     S: inputData.birthday,
                                 },
+                                newsInterests: {
+                                    S: inputData.newsInterest.toString(),
+                                },
                             },
                         };
                         // Add the new item to the users table
@@ -207,13 +210,17 @@ var update_user_profile = function (inputData, callback) {
                 'lastname = :lastname, ' +
                 'email = :email,' +
                 'affiliation = :affiliation, ' +
-                'birthday = :birthday',
+                'birthday = :birthday,' +
+                'newsInterests = :newsInterests',
             ExpressionAttributeValues: {
                 ':firstname': { S: inputData.firstname },
                 ':lastname': { S: inputData.lastname },
                 ':email': { S: inputData.email },
                 ':affiliation': { S: inputData.affiliation },
                 ':birthday': { S: inputData.birthday },
+                ':newsInterests': {
+                    S: inputData.newsInterest.toString(),
+                },
             },
             ReturnValues: 'UPDATED_NEW',
         };
@@ -774,18 +781,21 @@ var check_last_online = function (username, callback) {
 };
 
 var create_chat = function (title, members, callback) {
-
-	//going to use similar methodology to random "unique" ids as was used for message ids
-	//get the timestamp
+    //going to use similar methodology to random "unique" ids as was used for message ids
+    //get the timestamp
     var today = new Date();
-	//we must add 0s in front of months and days that are single digits so order is maintained
-	//in the database properly (13 would be placed ahead of 6 otherwise for example)
-	var month = today.getMonth() + 1;
-	if(month < 10) {month = '0'+month;}
-	var day = today.getDate();
-	if(day < 10) {day = '0'+day;}
-	
-	//putting all the time data together to create the timestamp and sortkey
+    //we must add 0s in front of months and days that are single digits so order is maintained
+    //in the database properly (13 would be placed ahead of 6 otherwise for example)
+    var month = today.getMonth() + 1;
+    if (month < 10) {
+        month = '0' + month;
+    }
+    var day = today.getDate();
+    if (day < 10) {
+        day = '0' + day;
+    }
+
+    //putting all the time data together to create the timestamp and sortkey
     var timestamp =
         today.getFullYear() +
         '-' +
@@ -874,14 +884,16 @@ var post_a_post = function (inputData, callback) {
             title: {
                 S: inputData.title,
             },
-            content: {
-                S: inputData.content,
-            },
             time: {
                 N: d.getTime().toString(),
             },
         },
     };
+    if (inputData.content) {
+        params.Item.content = {
+            S: inputData.content,
+        };
+    }
     if (inputData.wall) {
         params.Item.wall = {
             S: inputData.wall,
@@ -1014,7 +1026,7 @@ var get_title = function (chatid, callback) {
         },
     };
 
-	db.query(params, function (err, data) {
+    db.query(params, function (err, data) {
         if (err) {
             console.log(err);
         }
@@ -1044,7 +1056,6 @@ var get_friends_visualizer = function (username, nodeid, callback) {
                     })
                 );
             }
-
             Promise.all(promises).then((data) => {
                 let ret = [];
                 for (friend of data) {

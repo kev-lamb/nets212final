@@ -12,6 +12,9 @@
         ></script>
         <script src="account.js"></script>
         <script src="formvalidation.js"></script>
+        <script src="/createPost.js"></script>
+        <script src="signup.js"></script>
+
         <style>
             body {
                 padding-top: 40px;
@@ -29,6 +32,9 @@
                 border-color: red;
             }
         </style>
+        <script>
+            var me = '<%=me%>';
+        </script>
     </head>
     <body onload="populateDisplayById()">
         <div class="login-box">
@@ -78,6 +84,16 @@
                     name="birthday"
                     class="form-control"
                 />
+                <label for="interests">Interests:</label>
+                <select
+                    name="newsInterest"
+                    id="newsInterest"
+                    multiple
+                    class="form-select"
+                    aria-label="multiple select example"
+                >
+                    <option disabled value>-- select an option --</option>
+                </select>
                 <input
                     type="submit"
                     value="Submit"

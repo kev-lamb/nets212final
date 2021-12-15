@@ -1,5 +1,6 @@
 var usrname = document.getElementById('otherperson').innerText;
-
+var isFriends = false;
+let myInterval = '';
 function loadPage() {
     if (!mypage) {
         document.getElementById('createPost').style.display = 'none';
@@ -9,7 +10,9 @@ function loadPage() {
             'none';
         document.getElementById('friendButtonDiv').style.display = 'none';
     }
-    initPost();
+    if (isFriends || mypage) {
+        initPost();
+    }
 }
 function initButton() {
     setButton();
@@ -18,7 +21,17 @@ function initButton() {
 
 function initPost() {
     loadPost();
-    setInterval(() => loadPost(), 20000);
+    myInterval = setInterval(() => loadPost(), 20000);
+}
+
+function checkForPosts() {
+    if (isFriends || mypage) {
+        initPost();
+    } else {
+        clearInterval(myInterval);
+        document.getElementById('posts').innerHTML =
+            'Become Friends to See Posts';
+    }
 }
 
 function setButton() {
@@ -30,14 +43,29 @@ function setButton() {
         element.classList.remove('btn-success');
         element.classList.remove('btn-danger');
         if (results.Items.length == 0) {
+            isFriends = false;
             element.innerText = 'Add Friend';
             element.classList.add('btn-success');
         } else {
             element.innerText = 'Remove Friend';
             element.classList.add('btn-danger');
+            isFriends = true;
         }
+        if (!isFriends) {
+            document.getElementById('createPost').style.display = 'none';
+            document.getElementById('createPostElse').style.display = 'none';
+        } else {
+            if (!mypage) {
+                document.getElementById('createPostElse').style.display =
+                    'inline';
+            } else {
+                document.getElementById('createPost').style.display = 'inline';
+            }
+        }
+        checkForPosts();
     });
 }
+
 function changeFriendStatus() {
     let data = {
         user: document.getElementById('otherperson').innerText,
@@ -45,6 +73,24 @@ function changeFriendStatus() {
     let route = '';
     if (document.getElementById('friendbutton').innerText == 'Add Friend') {
         route = '/addfriend';
+        let title = me + ' sent a friend request to  ' + person;
+        let newFriendData = {
+            username: me,
+            title: title,
+            wall: document.getElementById('otherperson').innerText,
+        };
+        $.post('/makeapost', newFriendData, function () {
+            loadPost();
+        }).then(() => {
+            let title = person + ' accepted ' + me + "'s friend request";
+            let newFriendData = {
+                username: document.getElementById('otherperson').innerText,
+                title: title,
+                wall: me,
+                request: 'PennBook Bot',
+            };
+            $.post('/makeapost', newFriendData, function () {});
+        });
     } else if (
         document.getElementById('friendbutton').innerText == 'Remove Friend'
     ) {
@@ -64,8 +110,6 @@ function postNewPost(id) {
         title = document.getElementById('titleElse').value;
         content = document.getElementById('contentElse').value;
     }
-    console.log(title);
-    console.log(content);
     let data = {
         title: title,
         content: content,
@@ -77,10 +121,16 @@ function postNewPost(id) {
     });
     document.getElementById('title').value = '';
     document.getElementById('content').value = '';
+    if (id == 'createPostElse') {
+        document.getElementById('titleElse').value = '';
+        document.getElementById('contentElse').value = '';
+    }
     return false;
 }
 
 function loadPost() {
+    let active = document.activeElement.id;
+    console.log('load posts');
     let data = {
         username: person,
     };
@@ -97,22 +147,27 @@ function loadPost() {
     promisesBigQuery.push(
         $.get('/getwallposts', data).then((ret) => ret.Items)
     );
-    Promise.all(promisesBigQuery).then((results) => {
-        let arr = [...results[0], ...results[1]];
-        arr = arr.filter(
-            (post, index, self) =>
-                index ===
-                self.findIndex(
-                    (t) =>
-                        t.poster.S === post.poster.S && t.time.N === post.time.N
-                )
-        );
-        arr.sort((a, b) => a.time.N - b.time.N);
-        for (item of arr.reverse()) {
-            content += createPost(item);
-        }
-        document.getElementById('posts').innerHTML = content;
-    });
+    Promise.all(promisesBigQuery)
+        .then((results) => {
+            let arr = [...results[0], ...results[1]];
+            arr = arr.filter(
+                (post, index, self) =>
+                    index ===
+                    self.findIndex(
+                        (t) =>
+                            t.poster.S === post.poster.S &&
+                            t.time.N === post.time.N
+                    )
+            );
+            arr.sort((a, b) => a.time.N - b.time.N);
+            for (item of arr.reverse()) {
+                content += createPost(item);
+            }
+            document.getElementById('posts').innerHTML = content;
+        })
+        .then(() => {
+            loadComments(active);
+        });
 }
 function deletePost(username, time) {
     console.log('deleting post');

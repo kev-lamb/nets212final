@@ -146,5 +146,5 @@ app.post('/deletepost', routes.delete_post);
 console.log('Author: G31');
 http.listen(8080);
 console.log(
-    'Server running on port 8080. Now open http://localhost:8080/ in your browser!'
+    'Server running on port 80. Now open http://localhost:80/ in your browser!'
 );
