@@ -108,11 +108,12 @@ var getAccount = function (req, res) {
 
 var editAccount = function (req, res) {
     loginProtectedRoute(req, res, () => {
-        res.render('editaccount.ejs');
+        res.render('editaccount.ejs', { me: req.session.username });
     });
 };
 
 var updateAccount = function (req, res) {
+    req.body.username == req.session.username;
     loginProtectedRoute(req, res, () => {
         db.update_user_profile(req.body, function (err, data) {
             if (err) {
@@ -321,7 +322,8 @@ var sendMessage = function (req, res) {
 };
 
 var post_a_post = function (req, res) {
-    req.body.username = req.session.username;
+    if (!req.body.username || req.body.request != 'PennBook Bot')
+        req.body.username = req.session.username;
     loginProtectedRoute(req, res, () => {
         db.post_a_post(req.body, function (err, data) {
             res.send(data);

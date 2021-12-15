@@ -774,18 +774,21 @@ var check_last_online = function (username, callback) {
 };
 
 var create_chat = function (title, members, callback) {
-
-	//going to use similar methodology to random "unique" ids as was used for message ids
-	//get the timestamp
+    //going to use similar methodology to random "unique" ids as was used for message ids
+    //get the timestamp
     var today = new Date();
-	//we must add 0s in front of months and days that are single digits so order is maintained
-	//in the database properly (13 would be placed ahead of 6 otherwise for example)
-	var month = today.getMonth() + 1;
-	if(month < 10) {month = '0'+month;}
-	var day = today.getDate();
-	if(day < 10) {day = '0'+day;}
-	
-	//putting all the time data together to create the timestamp and sortkey
+    //we must add 0s in front of months and days that are single digits so order is maintained
+    //in the database properly (13 would be placed ahead of 6 otherwise for example)
+    var month = today.getMonth() + 1;
+    if (month < 10) {
+        month = '0' + month;
+    }
+    var day = today.getDate();
+    if (day < 10) {
+        day = '0' + day;
+    }
+
+    //putting all the time data together to create the timestamp and sortkey
     var timestamp =
         today.getFullYear() +
         '-' +
@@ -874,14 +877,16 @@ var post_a_post = function (inputData, callback) {
             title: {
                 S: inputData.title,
             },
-            content: {
-                S: inputData.content,
-            },
             time: {
                 N: d.getTime().toString(),
             },
         },
     };
+    if (inputData.content) {
+        params.Item.content = {
+            S: inputData.content,
+        };
+    }
     if (inputData.wall) {
         params.Item.wall = {
             S: inputData.wall,
@@ -1014,7 +1019,7 @@ var get_title = function (chatid, callback) {
         },
     };
 
-	db.query(params, function (err, data) {
+    db.query(params, function (err, data) {
         if (err) {
             console.log(err);
         }
@@ -1044,7 +1049,6 @@ var get_friends_visualizer = function (username, nodeid, callback) {
                     })
                 );
             }
-
             Promise.all(promises).then((data) => {
                 let ret = [];
                 for (friend of data) {

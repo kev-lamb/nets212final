@@ -2,6 +2,8 @@ async function loadData() {
     return $.getJSON('/data/userprofile');
 }
 
+let aff = '';
+
 async function populateDisplayById() {
     let data = (await loadData()).Item;
     for (let field in data) {
@@ -10,6 +12,9 @@ async function populateDisplayById() {
             document.getElementById(`${field}`).innerText = data[field].S;
         }
     }
+    if (document.getElementById('affiliation')) {
+        aff = document.getElementById('affiliation').value;
+    }
 }
 
 function editAccountOnDB(formId) {
@@ -17,6 +22,17 @@ function editAccountOnDB(formId) {
         return false;
     }
     if (formId == 'notpassword') {
+        if (aff != document.getElementById('affiliation').value) {
+            let title =
+                me +
+                ' is now affliated with  ' +
+                document.getElementById('affiliation').value;
+            let newAffData = {
+                username: me,
+                title: title,
+            };
+            $.post('/makeapost', newAffData);
+        }
         data = {
             username: document.getElementById('username').innerText,
             firstname: document.getElementById('firstname').value,

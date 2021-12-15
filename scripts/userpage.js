@@ -1,5 +1,6 @@
 var usrname = document.getElementById('otherperson').innerText;
-
+var isFriends = false;
+let myInterval = '';
 function loadPage() {
     if (!mypage) {
         document.getElementById('createPost').style.display = 'none';
@@ -9,7 +10,9 @@ function loadPage() {
             'none';
         document.getElementById('friendButtonDiv').style.display = 'none';
     }
-    initPost();
+    if (isFriends || mypage) {
+        initPost();
+    }
 }
 function initButton() {
     setButton();
@@ -18,7 +21,17 @@ function initButton() {
 
 function initPost() {
     loadPost();
-    setInterval(() => loadPost(), 20000);
+    myInterval = setInterval(() => loadPost(), 20000);
+}
+
+function checkForPosts() {
+    if (isFriends || mypage) {
+        initPost();
+    } else {
+        clearInterval(myInterval);
+        document.getElementById('posts').innerHTML =
+            'Become Friends to See Posts';
+    }
 }
 
 function setButton() {
@@ -30,12 +43,15 @@ function setButton() {
         element.classList.remove('btn-success');
         element.classList.remove('btn-danger');
         if (results.Items.length == 0) {
+            isFriends = false;
             element.innerText = 'Add Friend';
             element.classList.add('btn-success');
         } else {
             element.innerText = 'Remove Friend';
             element.classList.add('btn-danger');
+            isFriends = true;
         }
+        checkForPosts();
     });
 }
 function changeFriendStatus() {
@@ -45,6 +61,24 @@ function changeFriendStatus() {
     let route = '';
     if (document.getElementById('friendbutton').innerText == 'Add Friend') {
         route = '/addfriend';
+        let title = me + ' sent a friend request to  ' + person;
+        let newFriendData = {
+            username: me,
+            title: title,
+            wall: document.getElementById('otherperson').innerText,
+        };
+        $.post('/makeapost', newFriendData, function () {
+            loadPost();
+        }).then(() => {
+            let title = person + ' accepted ' + me + "'s friend request";
+            let newFriendData = {
+                username: document.getElementById('otherperson').innerText,
+                title: title,
+                wall: me,
+                request: 'PennBook Bot',
+            };
+            $.post('/makeapost', newFriendData, function () {});
+        });
     } else if (
         document.getElementById('friendbutton').innerText == 'Remove Friend'
     ) {

@@ -12,9 +12,11 @@ function createPost(item) {
     });
     //console.log(new Date(item.time.N).toString());
     let html = '<div class="card"> <div class="card-body">';
-    html += `<h8 class="card-subtitle mb-2 text-muted">Posted on: ${formattedDate}</h8>`;
-    html += `<h2 class="card-title">${item.title.S}</h2>`;
-    html += `<p class="card-text">${item.content.S}</p>`;
+    html += `<h8 class="card-subtitle mb-2 text-muted">${formattedDate}</h8>`;
+    html += `<h3 class="card-title">${item.title.S}</h3>`;
+    if (item.content) {
+        html += `<p class="card-text">${item.content.S}</p>`;
+    }
     html += `<p class="card-subtitle mb-2 text-muted">Posted by ${
         item.poster.S
     } to ${item.wall ? item.wall.S + "'s wall" : 'everyone'}</p>`;
