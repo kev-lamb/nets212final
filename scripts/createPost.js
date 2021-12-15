@@ -66,17 +66,17 @@ function loadComments(active) {
                 return result.Items;
             })
             .then((result) => {
-                let date = new Date(parseInt(item.time.N));
-                let formattedDate = date.toLocaleString('en-US', {
-                    hour12: true,
-                    hour: 'numeric',
-                    minute: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                });
                 let content = '<div class="list-group">';
                 for (item of result) {
+                    let date = new Date(parseInt(item.time.N));
+                    let formattedDate = date.toLocaleString('en-US', {
+                        hour12: true,
+                        hour: 'numeric',
+                        minute: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                    });
                     content += `<p class="list-group-item"> <strong>${item.poster.S}: </strong>${item.content.S} &emsp; <span class="commentTime">(${formattedDate})</span></p>`;
                 }
                 content += '</div>';
