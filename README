@@ -4,12 +4,11 @@
 2) Which features have been implemented? 
   (list features, or write 'Entire assignment'): All of 2.1 and 2.2 have been implemented. The backend of 2.3, however, 
                                                  is still being debugged and prevented much of 2.3 from being implemented. 
-                                                 *TODO* (If you wish to modify this.)
 
 3) Were any extra-credit tasks completed? If so, which ones?
-  (list extra-credit tasks): *TODO*
+  (list extra-credit tasks): no extra credit tasks were completed
   
-4) List of source files included: *TODO* 
+4) List of source files included: n/a 
 
 5a) Did your group personally write _all_ the code you are submitting
     (other than code from the course web page)?
@@ -27,4 +26,5 @@
 6) Please list the instructions building and running your project. 
    (The instructions must be sufficiently detailed for us to set up and run your application.):
    
-   *TODO*
+   first, run "npm install" from the command line to install all dependencies
+   when you wish to run the web app, call "node app.js" from the command line
